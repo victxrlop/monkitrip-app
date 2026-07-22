@@ -1348,11 +1348,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
           sb.realtime.disconnect();
         } catch(e){}
       } else {
-        // Returning to foreground: sync timer and reconnect realtime
+        // Returning to foreground: sync timer, reconnect realtime, refresh location
         syncChronoFromBackground();
         setTimeout(()=>{
           try { if(currentUser){ subscribeRealtime(); } } catch(e){}
         }, 2000);
+        if(leafletMap){ centerOnMe(true); }
       }
     });
   }
@@ -2411,36 +2412,89 @@ function fitAllPins(){
   leafletMap.fitBounds(bounds, { padding:[40,40], maxZoom:13 });
 }
 
-async function centerOnMe(silent){
+async function ensureLocationPermission(){
+  try {
+    const Geo = window.Capacitor?.Plugins?.Geolocation;
+    if(!Geo) return 'browser'; // no native plugin, will use browser API
+
+    const current = await Geo.checkPermissions();
+    if(current.location === 'granted' || current.coarseLocation === 'granted'){
+      return 'granted';
+    }
+    const requested = await Geo.requestPermissions();
+    if(requested.location === 'granted' || requested.coarseLocation === 'granted'){
+      return 'granted';
+    }
+    return 'denied';
+  } catch(e){
+    console.error('Permission check error', e);
+    return 'error';
+  }
+}
+
+async function centerOnMe(silent, attempt = 0){
   if(!silent) showToast('Buscando tu ubicación...');
+
+  const permStatus = await ensureLocationPermission();
+
+  if(permStatus === 'denied'){
+    if(!silent) showToast('Permiso de ubicación denegado — actívalo en Ajustes');
+    useLastKnownLocationOrDefault();
+    return;
+  }
 
   // Try Capacitor native plugin first
   try {
     const Geo = window.Capacitor?.Plugins?.Geolocation;
     if(Geo){
-      const pos = await Geo.getCurrentPosition({ enableHighAccuracy:true, timeout:10000 });
+      const pos = await Geo.getCurrentPosition({ enableHighAccuracy:true, timeout:12000 });
       placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+      localStorage.setItem('mk_last_lat', pos.coords.latitude);
+      localStorage.setItem('mk_last_lng', pos.coords.longitude);
       return;
     }
   } catch(e){
-    console.error('Capacitor geolocation error', e);
-    if(!silent) showToast('No se pudo obtener tu ubicación — revisa permisos');
-    if(silent) return; // don't fall through with a second error on silent init
+    console.error('Capacitor geolocation error (attempt ' + attempt + ')', e);
+    // Retry once before giving up — GPS can take a moment to get a fix,
+    // especially right after the app starts or permission was just granted
+    if(attempt < 1){
+      setTimeout(()=> centerOnMe(silent, attempt + 1), 2000);
+      return;
+    }
+    if(!silent) showToast('No se pudo obtener tu ubicación — revisa el GPS');
+    useLastKnownLocationOrDefault();
+    return;
   }
 
-  // Fallback: browser geolocation
+  // Fallback: browser geolocation (only reached if Capacitor plugin isn't available at all)
   if(!navigator.geolocation){
     if(!silent) showToast('Geolocalización no disponible en este dispositivo');
+    useLastKnownLocationOrDefault();
     return;
   }
   navigator.geolocation.getCurrentPosition(
-    pos=>{ placeUserMarker(pos.coords.latitude, pos.coords.longitude); },
+    pos=>{
+      placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+      localStorage.setItem('mk_last_lat', pos.coords.latitude);
+      localStorage.setItem('mk_last_lng', pos.coords.longitude);
+    },
     err=>{
       console.error(err);
       if(!silent) showToast('No se pudo obtener tu ubicación — revisa permisos');
+      useLastKnownLocationOrDefault();
     },
-    { enableHighAccuracy:true, timeout:10000 }
+    { enableHighAccuracy:true, timeout:12000 }
   );
+}
+
+function useLastKnownLocationOrDefault(){
+  const lastLat = localStorage.getItem('mk_last_lat');
+  const lastLng = localStorage.getItem('mk_last_lng');
+  if(lastLat && lastLng){
+    placeUserMarker(parseFloat(lastLat), parseFloat(lastLng));
+  }
+  // If no last known location exists either, the map simply stays centered
+  // on the default Temuco view set in initMap — no crash, no null coords used.
 }
 
 function placeUserMarker(latitude, longitude){
