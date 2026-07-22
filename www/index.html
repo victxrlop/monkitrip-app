@@ -1337,23 +1337,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
   closeAllModals();
   initMusicDrag();
 
-  // Handle app state changes (background/foreground)
+  // ── APP LIFECYCLE: comprehensive reconnection strategy ──
   const CapAppDom = window.Capacitor?.Plugins?.App;
   if(CapAppDom){
     CapAppDom.addListener('appStateChange', ({ isActive }) => {
       if(!isActive){
+        appLog('App → background');
         // Going to background: disconnect realtime cleanly
         try {
           if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
           sb.realtime.disconnect();
-        } catch(e){}
+        } catch(e){ appLog('Error disconnecting realtime: ' + e.message); }
       } else {
-        // Returning to foreground: sync timer, reconnect realtime, refresh location
-        syncChronoFromBackground();
-        setTimeout(()=>{
-          try { if(currentUser){ subscribeRealtime(); } } catch(e){}
-        }, 2000);
-        if(leafletMap){ centerOnMe(true); }
+        appLog('App → foreground, starting recovery sequence');
+        recoverAppState();
+      }
+    });
+  }
+
+  // ── NETWORK CHANGES: WiFi ↔ mobile data, connection lost/restored ──
+  const CapNetwork = window.Capacitor?.Plugins?.Network;
+  if(CapNetwork){
+    CapNetwork.addListener('networkStatusChange', (status)=>{
+      appLog('Network changed: ' + status.connectionType + ' connected=' + status.connected);
+      if(status.connected && currentUser){
+        // Connection restored or changed — realtime sockets from the old
+        // network are likely dead even if "connected" flips true→true→true,
+        // so force a clean reconnect any time this fires while logged in.
+        recoverAppState();
       }
     });
   }
@@ -1404,6 +1415,63 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
   }
 });
+
+let recoveryInProgress = false;
+
+async function recoverAppState(){
+  if(recoveryInProgress) return;
+  recoveryInProgress = true;
+  try {
+    // 1. Validate session is still valid — catches token expiry from long
+    // background periods or process kills, without blocking on a full refresh.
+    if(currentUser){
+      try {
+        const { data: { session } } = await timeoutPromise(sb.auth.getSession(), 6000, 'getSession');
+        if(!session?.user){
+          appLog('Session lost on resume — showing login');
+          currentUser = null;
+          appInitialized = false;
+          document.getElementById('auth-screen').classList.remove('hidden');
+          recoveryInProgress = false;
+          return;
+        }
+      } catch(e){ appLog('getSession check failed (non-blocking): ' + e.message); }
+    }
+
+    // 2. Sync the study timer with real elapsed time
+    syncChronoFromBackground();
+
+    // 3. Reconnect Realtime after giving Android a moment to restore network
+    setTimeout(()=>{
+      try { if(currentUser){ subscribeRealtime(); } } catch(e){ appLog('Realtime reconnect error: ' + e.message); }
+    }, 2000);
+
+    // 4. Refresh location if the map has been initialized before
+    if(leafletMap){ centerOnMe(true); }
+
+    // 5. Re-check critical permissions silently (location, notifications) —
+    // if the user revoked them from Settings while the app was away, we
+    // want to know rather than silently failing later.
+    if(currentUser){
+      ensureLocationPermission().catch(()=>{});
+    }
+
+  } finally {
+    recoveryInProgress = false;
+  }
+}
+
+// ── LIGHTWEIGHT LOGGER ──────────────────────────────
+// Keeps the last 50 lifecycle/network events in memory for debugging.
+// Not shown to the user; accessible via getAppLogs() in dev tools console.
+const appLogBuffer = [];
+function appLog(msg){
+  const entry = new Date().toISOString() + ' — ' + msg;
+  appLogBuffer.push(entry);
+  if(appLogBuffer.length > 50) appLogBuffer.shift();
+  console.log('[monkitrip]', msg);
+}
+window.getAppLogs = () => appLogBuffer.join('\n');
 
 // Touch swipe
 (function(){
@@ -2632,7 +2700,14 @@ function adjustTime(type, delta){
     workTimeMins = Math.max(5, workTimeMins + delta);
     document.getElementById('work-time-display').textContent = workTimeMins;
   } else {
-    breakTimeMins = Math.max(1, breakTimeMins + delta);
+    if(delta > 0){
+      // Snap up to the next multiple of 5 (1 -> 5, 5 -> 10, 8 -> 10, etc.)
+      breakTimeMins = Math.ceil((breakTimeMins + 1) / 5) * 5;
+    } else {
+      // Snap down to the previous multiple of 5, minimum 1
+      const prevStep = Math.floor((breakTimeMins - 1) / 5) * 5;
+      breakTimeMins = Math.max(1, prevStep);
+    }
     document.getElementById('break-time-display').textContent = breakTimeMins;
   }
   if(!chronoRunning) resetChrono();
