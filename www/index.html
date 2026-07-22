@@ -2785,64 +2785,60 @@ let notifUpdateInterval = null;
 
 async function scheduleTimerNotification(secsRemaining, label){
   try {
+    if(secsRemaining <= 0) return;
+
+    // Preferred: native foreground-service chronometer notification —
+    // purple background, ticks by itself, and fires sound+vibration exactly
+    // at zero from native Android code (no JS timers involved at all).
+    const TimerNotif = window.Capacitor?.Plugins?.TimerNotification;
+    if(TimerNotif){
+      await TimerNotif.start({
+        title: label,
+        durationSecs: secsRemaining,
+        color: '#A87EF5',
+      });
+      return; // native side handles everything, including the end alert
+    }
+
+    // Fallback if the native plugin isn't built into this APK yet:
+    // one static notification (no per-second spam) + a scheduled final alert
     const LN = window.Capacitor?.Plugins?.LocalNotifications;
-    if(!LN || secsRemaining <= 0) return;
-
-    await LN.cancel({ notifications: [{ id: 1 }, { id: 2 }] }).catch(()=>{});
-
-    // Ongoing notification showing live progress while the timer runs
-    await showOngoingTimerNotification(secsRemaining, label);
-
-    // Final notification that fires exactly when the timer reaches 0
-    const fireAt = new Date(Date.now() + secsRemaining * 1000);
-    await LN.schedule({
-      notifications: [{
-        id: 2,
-        title: '⏱ Monkitrip',
-        body: `¡${label}!`,
-        schedule: { at: fireAt },
-        smallIcon: 'ic_stat_icon_config_sample',
-        channelId: 'study_timer',
-        extra: { isTimerEnd: true }
-      }]
-    });
-
-    // Keep the ongoing notification's countdown updated every second
-    clearInterval(notifUpdateInterval);
-    notifUpdateInterval = setInterval(()=>{
-      if(!chronoRunning){ clearInterval(notifUpdateInterval); return; }
-      const totalSecs = studyPhase==='work' ? workTimeMins*60 : breakTimeMins*60;
-      const remaining = Math.max(0, totalSecs - chronoSecs);
-      if(remaining <= 0){ clearInterval(notifUpdateInterval); return; }
-      showOngoingTimerNotification(remaining, label);
-    }, 1000);
+    if(LN){
+      await LN.cancel({ notifications: [{ id: 1 }, { id: 2 }] }).catch(()=>{});
+      const m = Math.floor(secsRemaining/60);
+      const s = secsRemaining%60;
+      await LN.schedule({
+        notifications: [{
+          id: 1,
+          title: '⏱ ' + label,
+          body: `${m}:${String(s).padStart(2,'0')} — en curso`,
+          ongoing: true,
+          autoCancel: false,
+          smallIcon: 'ic_stat_icon_config_sample',
+          channelId: 'study_timer',
+        }]
+      });
+      const fireAt = new Date(Date.now() + secsRemaining * 1000);
+      await LN.schedule({
+        notifications: [{
+          id: 2,
+          title: '⏱ Monkitrip',
+          body: `¡${label} terminado!`,
+          schedule: { at: fireAt },
+          smallIcon: 'ic_stat_icon_config_sample',
+          channelId: 'study_timer',
+          extra: { isTimerEnd: true }
+        }]
+      });
+    }
 
   } catch(e){ console.error('Notification schedule error', e); }
 }
 
-async function showOngoingTimerNotification(secsRemaining, label){
-  try {
-    const LN = window.Capacitor?.Plugins?.LocalNotifications;
-    if(!LN) return;
-    const m = Math.floor(secsRemaining/60);
-    const s = secsRemaining%60;
-    await LN.schedule({
-      notifications: [{
-        id: 1,
-        title: '⏱ ' + label,
-        body: `${m}:${String(s).padStart(2,'0')} restantes`,
-        ongoing: true,
-        autoCancel: false,
-        smallIcon: 'ic_stat_icon_config_sample',
-        channelId: 'study_timer',
-      }]
-    });
-  } catch(e){ console.error('Ongoing notification error', e); }
-}
-
 async function cancelTimerNotification(){
   try {
-    clearInterval(notifUpdateInterval);
+    const TimerNotif = window.Capacitor?.Plugins?.TimerNotification;
+    if(TimerNotif){ await TimerNotif.stop().catch(()=>{}); }
     const LN = window.Capacitor?.Plugins?.LocalNotifications;
     if(LN) await LN.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
   } catch(e){}
