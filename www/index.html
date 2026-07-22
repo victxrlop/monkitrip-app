@@ -498,6 +498,32 @@
     body[data-theme="purple"] .modal-inner .f-textarea {
       background:#1E1235; color:#EDE8FF; border-color:rgba(160,120,240,0.3);
     }
+
+    /* Friends modal */
+    .friends-tab {
+      flex:1; padding:0.5rem; border:none; border-radius:7px;
+      background:transparent; font-family:'DM Sans',sans-serif;
+      font-size:12.5px; font-weight:700; color:var(--text-muted); cursor:pointer;
+    }
+    .friends-tab.active { background:var(--surface); color:var(--text); }
+    .friend-row {
+      display:flex; align-items:center; gap:0.75rem;
+      padding:0.65rem 0.25rem; border-bottom:1px solid var(--border);
+    }
+    .friend-row:last-child { border-bottom:none; }
+    .friend-row-avatar {
+      width:38px; height:38px; border-radius:50%; background:var(--accent);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:14px; flex-shrink:0;
+    }
+    .friend-row-name { flex:1; font-weight:700; font-size:14px; color:var(--text); }
+    .friend-row-btn {
+      padding:0.4rem 0.8rem; border-radius:20px; border:none;
+      font-size:12px; font-weight:700; cursor:pointer;
+    }
+    .friend-row-btn.accept { background:var(--accent); color:#fff; }
+    .friend-row-btn.reject { background:var(--surface2); color:var(--text-muted); }
+    .friends-empty { text-align:center; padding:2rem 1rem; color:var(--text-muted); font-size:13px; font-weight:600; }
     .modal-inner .f-input:focus,
     .modal-inner .f-select:focus,
     .modal-inner .f-textarea:focus { border-color:var(--accent); }
@@ -1017,6 +1043,7 @@
       <div class="profile-menu-email" id="pm-email">—</div>
     </div>
     <button class="profile-menu-item" onclick="closeProfileMenu();openEditProfile()">Editar perfil</button>
+    <button class="profile-menu-item" onclick="closeProfileMenu();openFriendsModal()">Amigos</button>
     <button class="profile-menu-item" onclick="closeProfileMenu();showToast('Próximamente: notificaciones')">Notificaciones</button>
     <button class="profile-menu-item" onclick="closeProfileMenu();showToast('Próximamente: privacidad')">Privacidad</button>
     <div class="profile-menu-divider"></div>
@@ -1026,6 +1053,37 @@
 </div>
 
 
+
+<!-- FRIENDS MODAL -->
+<div class="modal-backdrop" id="backdrop-friends" onclick="closeFriendsModal()"></div>
+<div class="modal-sheet" id="modal-friends">
+  <div class="modal-inner">
+    <div class="m-handle"></div>
+    <div class="m-title">Amigos</div>
+
+    <div style="display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:10px;margin-bottom:1rem">
+      <button id="friends-tab-search" class="friends-tab active" onclick="setFriendsTab('search')">Buscar</button>
+      <button id="friends-tab-requests" class="friends-tab" onclick="setFriendsTab('requests')">Solicitudes <span id="friends-req-badge" style="display:none"></span></button>
+      <button id="friends-tab-list" class="friends-tab" onclick="setFriendsTab('list')">Mis amigos</button>
+    </div>
+
+    <!-- Search tab -->
+    <div id="friends-panel-search">
+      <input type="text" id="friends-search-input" placeholder="Buscar por nombre..." class="f-input" style="margin-bottom:0.75rem" oninput="searchFriendCandidates(this.value)">
+      <div id="friends-search-results" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+
+    <!-- Requests tab -->
+    <div id="friends-panel-requests" style="display:none">
+      <div id="friends-requests-list" style="max-height:360px;overflow-y:auto"></div>
+    </div>
+
+    <!-- My friends tab -->
+    <div id="friends-panel-list" style="display:none">
+      <div id="friends-list" style="max-height:360px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
 
 <!-- EDIT PROFILE MODAL -->
 <div class="modal-backdrop" id="backdrop-editprofile" onclick="closeEditProfile()"></div>
@@ -1666,6 +1724,197 @@ async function initFCM(){
   }
 }
 
+// ── FRIENDS SYSTEM ─────────────────────────────────
+let friendsTab = 'search';
+let searchDebounce = null;
+let friendRequestsBadgeChannel = null;
+
+function openFriendsModal(){
+  document.getElementById('modal-friends').classList.add('open');
+  document.getElementById('backdrop-friends').classList.add('open');
+  setFriendsTab('search');
+  loadFriendRequests();
+}
+function closeFriendsModal(){
+  document.getElementById('modal-friends').classList.remove('open');
+  document.getElementById('backdrop-friends').classList.remove('open');
+}
+
+function setFriendsTab(tab){
+  friendsTab = tab;
+  ['search','requests','list'].forEach(t=>{
+    document.getElementById('friends-tab-'+t).classList.toggle('active', t===tab);
+    document.getElementById('friends-panel-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  if(tab === 'requests') loadFriendRequests();
+  if(tab === 'list') loadFriendsList();
+}
+
+function searchFriendCandidates(query){
+  clearTimeout(searchDebounce);
+  const resultsEl = document.getElementById('friends-search-results');
+  if(!query || query.trim().length < 2){
+    resultsEl.innerHTML = '<div class="friends-empty">Escribe al menos 2 letras para buscar</div>';
+    return;
+  }
+  searchDebounce = setTimeout(async ()=>{
+    try {
+      const { data, error } = await sb.from('profiles')
+        .select('id,name')
+        .ilike('name', `%${query.trim()}%`)
+        .neq('id', currentUser.id)
+        .limit(20);
+      if(error) throw error;
+
+      if(!data || data.length === 0){
+        resultsEl.innerHTML = '<div class="friends-empty">No se encontraron usuarios</div>';
+        return;
+      }
+
+      // Check existing relationship status for each candidate
+      const { data: existing } = await sb.from('friend_requests')
+        .select('from_user,to_user,status')
+        .or(`from_user.eq.${currentUser.id},to_user.eq.${currentUser.id}`);
+
+      resultsEl.innerHTML = data.map(u=>{
+        const rel = (existing||[]).find(r =>
+          (r.from_user === currentUser.id && r.to_user === u.id) ||
+          (r.to_user === currentUser.id && r.from_user === u.id)
+        );
+        let actionHtml;
+        if(!rel){
+          actionHtml = `<button class="friend-row-btn accept" onclick="sendFriendRequest('${u.id}')">Agregar</button>`;
+        } else if(rel.status === 'accepted'){
+          actionHtml = `<span style="font-size:12px;font-weight:700;color:var(--text-muted)">Ya son amigos</span>`;
+        } else if(rel.status === 'pending'){
+          actionHtml = `<span style="font-size:12px;font-weight:700;color:var(--text-muted)">Pendiente</span>`;
+        } else {
+          actionHtml = `<button class="friend-row-btn accept" onclick="sendFriendRequest('${u.id}')">Agregar</button>`;
+        }
+        return `<div class="friend-row">
+          <div class="friend-row-avatar">${(u.name||'?').charAt(0).toUpperCase()}</div>
+          <div class="friend-row-name">${u.name||'Sin nombre'}</div>
+          ${actionHtml}
+        </div>`;
+      }).join('');
+    } catch(e){
+      console.error('searchFriendCandidates error', e);
+      resultsEl.innerHTML = '<div class="friends-empty">Error al buscar</div>';
+    }
+  }, 400);
+}
+
+async function sendFriendRequest(toUserId){
+  try {
+    const { error } = await sb.from('friend_requests').insert({
+      from_user: currentUser.id,
+      to_user: toUserId,
+      status: 'pending'
+    });
+    if(error) throw error;
+    showToast('Solicitud enviada');
+    searchFriendCandidates(document.getElementById('friends-search-input').value);
+  } catch(e){
+    console.error(e);
+    showToast('Error al enviar solicitud');
+  }
+}
+
+async function loadFriendRequests(){
+  const listEl = document.getElementById('friends-requests-list');
+  try {
+    const { data, error } = await sb.from('friend_requests')
+      .select('id,from_user,status,profiles!friend_requests_from_user_fkey(name)')
+      .eq('to_user', currentUser.id)
+      .eq('status', 'pending');
+    if(error) throw error;
+
+    const badge = document.getElementById('friends-req-badge');
+    if(data && data.length > 0){
+      badge.style.display = 'inline';
+      badge.textContent = `(${data.length})`;
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if(!data || data.length === 0){
+      listEl.innerHTML = '<div class="friends-empty">No tienes solicitudes pendientes</div>';
+      return;
+    }
+
+    listEl.innerHTML = data.map(r=>`
+      <div class="friend-row">
+        <div class="friend-row-avatar">${(r.profiles?.name||'?').charAt(0).toUpperCase()}</div>
+        <div class="friend-row-name">${r.profiles?.name||'Sin nombre'}</div>
+        <button class="friend-row-btn reject" onclick="respondFriendRequest('${r.id}','rejected')">Rechazar</button>
+        <button class="friend-row-btn accept" onclick="respondFriendRequest('${r.id}','accepted')">Aceptar</button>
+      </div>`).join('');
+  } catch(e){
+    console.error('loadFriendRequests error', e);
+    listEl.innerHTML = '<div class="friends-empty">Error al cargar solicitudes</div>';
+  }
+}
+
+async function respondFriendRequest(requestId, status){
+  try {
+    const { error } = await sb.from('friend_requests').update({ status }).eq('id', requestId);
+    if(error) throw error;
+    showToast(status === 'accepted' ? '¡Ahora son amigos!' : 'Solicitud rechazada');
+    loadFriendRequests();
+  } catch(e){
+    console.error(e);
+    showToast('Error al responder solicitud');
+  }
+}
+
+async function loadFriendsList(){
+  const listEl = document.getElementById('friends-list');
+  try {
+    const { data, error } = await sb.from('friend_requests')
+      .select('from_user,to_user,profiles!friend_requests_from_user_fkey(id,name),profiles_to:profiles!friend_requests_to_user_fkey(id,name)')
+      .eq('status', 'accepted')
+      .or(`from_user.eq.${currentUser.id},to_user.eq.${currentUser.id}`);
+    if(error) throw error;
+
+    if(!data || data.length === 0){
+      listEl.innerHTML = '<div class="friends-empty">Aún no tienes amigos agregados</div>';
+      return;
+    }
+
+    const friends = data.map(r=>{
+      const isFromMe = r.from_user === currentUser.id;
+      return isFromMe ? r.profiles_to : r.profiles;
+    }).filter(Boolean);
+
+    listEl.innerHTML = friends.map(f=>`
+      <div class="friend-row">
+        <div class="friend-row-avatar">${(f.name||'?').charAt(0).toUpperCase()}</div>
+        <div class="friend-row-name">${f.name||'Sin nombre'}</div>
+      </div>`).join('');
+  } catch(e){
+    console.error('loadFriendsList error', e);
+    listEl.innerHTML = '<div class="friends-empty">Error al cargar amigos</div>';
+  }
+}
+
+// Returns the current user's accepted friends as [{id, name}, ...]
+async function getMyFriends(){
+  try {
+    const { data, error } = await sb.from('friend_requests')
+      .select('from_user,to_user,profiles!friend_requests_from_user_fkey(id,name),profiles_to:profiles!friend_requests_to_user_fkey(id,name)')
+      .eq('status', 'accepted')
+      .or(`from_user.eq.${currentUser.id},to_user.eq.${currentUser.id}`);
+    if(error) throw error;
+    return (data||[]).map(r=>{
+      const isFromMe = r.from_user === currentUser.id;
+      return isFromMe ? r.profiles_to : r.profiles;
+    }).filter(Boolean);
+  } catch(e){
+    console.error('getMyFriends error', e);
+    return [];
+  }
+}
+
 async function loadProfile(){
   try {
     const {data, error} = await timeoutPromise(
@@ -1684,11 +1933,11 @@ async function loadProfile(){
 }
 
 function closeAllModals(){
-  ['backdrop-editprofile','backdrop-invite','backdrop-waiting','backdrop-nd','backdrop-idea','backdrop-spotify'].forEach(id=>{
+  ['backdrop-editprofile','backdrop-invite','backdrop-waiting','backdrop-nd','backdrop-idea','backdrop-spotify','backdrop-friends'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.classList.remove('open');
   });
-  ['modal-editprofile','modal-invite','modal-waiting','modal-nd','modal-idea','modal-spotify'].forEach(id=>{
+  ['modal-editprofile','modal-invite','modal-waiting','modal-nd','modal-idea','modal-spotify','modal-friends'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.classList.remove('open');
   });
@@ -2287,10 +2536,14 @@ let pendingInviteId = null;
 async function inviteToGame(gameId, gameName){
   if(!currentUser){ showToast('No hay sesión activa'); return; }
   try {
-    // Get the other user
-    const { data: others } = await sb.from('profiles').select('id,name').neq('id', currentUser.id);
-    if(!others || others.length === 0){ showToast('No hay otro usuario registrado aún'); return; }
-    const target = others[0];
+    // Only friends can be invited to games now
+    const friends = await getMyFriends();
+    if(!friends || friends.length === 0){
+      showToast('Agrega un amigo primero para invitarlo a jugar');
+      openFriendsModal();
+      return;
+    }
+    const target = friends[0];
 
     // Create invite in DB
     const { data: invite, error } = await sb.from('game_invites').insert({
