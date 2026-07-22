@@ -1,0 +1,20 @@
+{
+  "appId": "com.victor.monkitrip",
+  "appName": "Monkitrip",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#FFF0F4"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#B02050",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false
+    }
+  }
+}

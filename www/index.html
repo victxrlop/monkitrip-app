@@ -1,0 +1,3219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Monkitrip">
+  <meta name="theme-color" content="#B02050" id="theme-meta">
+  <title>Monkitrip</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@capacitor/geolocation@6/dist/plugin.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+    button, input, textarea, select, a {
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
+    button:focus, input:focus, textarea:focus, select:focus, a:focus {
+      outline: none;
+    }
+    button::-moz-focus-inner { border: 0; }
+    :root {
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --radius: 16px; --radius-sm: 12px;
+    }
+    [data-theme="rose"] {
+      --bg:#FFF0F4; --surface:#FFFAFB; --surface2:#F5D0DC;
+      --border:rgba(140,40,70,0.20); --border2:rgba(140,40,70,0.44);
+      --text:#1A0008; --text-muted:#5C1528;
+      --accent:#B02050; --accent-bg:#F5C8D8; --accent-text:#5C0020;
+      --tag-bg:#F0B8CC; --tag-text:#5C0020;
+      --nav-bg:#EAA8BE; --nav-inactive:#4A0818;
+      --nav-active-bg:#FFFAFB; --nav-active-text:#1A0008;
+      --stat-bg:#F5C8D8;
+      --green:#1A5C35; --green-bg:#C8E8D8; --green-text:#0A3820;
+      --dd-bg:#FFFAFB; --dd-border:rgba(140,40,70,0.15); --dd-hover:#FFF0F4;
+      --rec-bg:#FFF5F8; --rec-border:rgba(140,40,70,0.16);
+      --f-inactive-bg:#F5C8D8; --f-inactive-text:#1A0008; --f-inactive-bdr:#B02050;
+      --f-active-bg:#B02050; --f-active-text:#fff;
+    }
+    [data-theme="purple"] {
+      --bg:#0E0A1A; --surface:#160E28; --surface2:#1E1235;
+      --border:rgba(160,120,240,0.18); --border2:rgba(160,120,240,0.38);
+      --text:#EDE8FF; --text-muted:#9B85CC;
+      --accent:#A87EF5; --accent-bg:#2A1855; --accent-text:#D4B8FF;
+      --tag-bg:#1E1235; --tag-text:#C4A8FF;
+      --nav-bg:#1A1030; --nav-inactive:#7A60AA;
+      --nav-active-bg:#160E28; --nav-active-text:#EDE8FF;
+      --stat-bg:#1E1235;
+      --green:#7EC8A4; --green-bg:#0D2820; --green-text:#7EC8A4;
+      --dd-bg:#1E1235; --dd-border:rgba(160,120,240,0.22); --dd-hover:#2A1855;
+      --rec-bg:#1E1235; --rec-border:rgba(160,120,240,0.18);
+      --f-inactive-bg:#1E1235; --f-inactive-text:#C4A8FF; --f-inactive-bdr:rgba(160,120,240,0.4);
+      --f-active-bg:#A87EF5; --f-active-text:#fff;
+    }
+    #auth-screen.hidden { display:none !important; }
+    #app { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); width:100vw; height:100vh; display:flex; flex-direction:column; overflow:hidden; font-size:15px; transition:background 0.3s,color 0.3s; -webkit-tap-highlight-color:transparent; user-select:none; }
+    #header { flex-shrink:0; background:var(--surface); border-bottom:1px solid var(--border); padding:calc(0.9rem + var(--safe-top)) 1.25rem 0.85rem; z-index:20; }
+    .header-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem; }
+    .logo { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.4rem; color:var(--text); display:flex; align-items:center; gap:6px; letter-spacing:-0.02em; }
+    .logo em { color:var(--accent); font-style:normal; font-weight:700; }
+    .logo-v { font-family:'DM Sans',sans-serif; font-size:9px; font-weight:800; color:var(--text-muted); background:var(--surface2); border-radius:6px; padding:2px 6px; align-self:flex-end; margin-bottom:3px; }
+    .header-right { display:flex; align-items:center; gap:10px; }
+    .theme-btn { background:var(--surface2); border:1.5px solid var(--f-inactive-bdr); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:700; color:var(--text); font-family:'DM Sans',sans-serif; cursor:pointer; min-height:36px; }
+    .avatar { width:36px; height:36px; border-radius:50%; background:var(--accent-bg); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:var(--accent-text); flex-shrink:0; cursor:pointer; overflow:hidden; }
+    .avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+    /* PROFILE MENU */
+    .profile-menu-overlay { display:none; position:fixed; inset:0; z-index:150; }
+    .profile-menu-overlay.open { display:block; }
+    .profile-menu {
+      position:fixed; top:calc(var(--safe-top) + 90px); right:1rem;
+      background:var(--surface); border:1.5px solid var(--border2);
+      border-radius:18px; padding:0.5rem;
+      min-width:220px; z-index:151;
+      box-shadow:0 8px 32px rgba(0,0,0,0.18);
+      animation:menuIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes menuIn { from { opacity:0; transform:scale(0.92) translateY(-8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+    .profile-menu-header {
+      padding:0.85rem 0.9rem 0.75rem;
+      border-bottom:1px solid var(--border);
+      margin-bottom:0.4rem;
+    }
+    .profile-menu-name { font-weight:800; font-size:16px; color:var(--text); }
+    .profile-menu-email { font-size:11px; color:var(--text-muted); font-weight:600; margin-top:3px; }
+    .profile-menu-item {
+      display:flex; align-items:center; gap:12px;
+      padding:0.7rem 0.9rem; border-radius:12px;
+      font-size:14px; font-weight:600; color:var(--text);
+      cursor:pointer; transition:background 0.15s; width:100%;
+      background:none; border:none; font-family:'DM Sans',sans-serif;
+      text-align:left; min-height:46px;
+    }
+    .profile-menu-item:hover, .profile-menu-item:active { background:var(--dd-hover); }
+    .profile-menu-item.danger { color:#8B0010; }
+    [data-theme="purple"] .profile-menu-item.danger { color:#F09595; }
+    .profile-menu-item .pmi-icon { font-size:1.1rem; flex-shrink:0; }
+    .profile-menu-divider { height:1px; background:var(--border); margin:0.4rem 0; }
+    .nav-tabs { display:flex; gap:3px; background:var(--nav-bg); padding:4px; border-radius:12px; }
+    .nav-tab { flex:1; padding:0.48rem 0; border:none; background:transparent; border-radius:9px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; color:var(--nav-inactive); cursor:pointer; position:relative; min-height:40px; transition:all 0.2s; }
+    .nav-tab.active { background:var(--nav-active-bg); color:var(--nav-active-text); font-weight:800; box-shadow:0 1px 6px rgba(0,0,0,0.12); }
+    .nav-tab.active::after { content:''; display:block; width:20px; height:3px; background:var(--accent); border-radius:2px; margin:3px auto 0; }
+    .content { flex:1; overflow:hidden; position:relative; }
+
+    /* ── SWIPE PAGES ── */
+    #pages-wrap {
+      display:flex; width:400%; height:100%;
+      transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      will-change:transform;
+    }
+    .page {
+      width:25%; height:100%; flex-shrink:0;
+      overflow-y:auto; overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior-y:contain;
+      padding:1.1rem 1.25rem;
+      padding-bottom:calc(80px + var(--safe-bottom));
+    }
+
+    /* ── BOTTOM NAV ── */
+    #bottom-nav {
+      position:fixed; bottom:0; left:0; right:0;
+      height:calc(60px + var(--safe-bottom));
+      background:var(--surface);
+      border-top:1px solid var(--border);
+      display:flex; align-items:flex-start;
+      padding-top:6px;
+      z-index:40;
+      box-shadow:0 -2px 12px rgba(0,0,0,0.08);
+    }
+    .bnav-item {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; gap:3px;
+      padding:4px 0;
+      cursor:pointer; border:none; background:none;
+      font-family:'DM Sans',sans-serif;
+      -webkit-tap-highlight-color:transparent;
+      transition:opacity 0.15s;
+    }
+    .bnav-icon {
+      width:28px; height:28px; border-radius:9px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.2rem; transition:background 0.18s, transform 0.18s;
+    }
+    .bnav-label {
+      font-size:10px; font-weight:700;
+      color:var(--text-muted); letter-spacing:0.02em;
+      transition:color 0.18s;
+    }
+    .bnav-item.active .bnav-icon {
+      background:var(--accent-bg);
+      transform:scale(1.08);
+    }
+    .bnav-item.active .bnav-label { color:var(--accent); }
+
+    /* ── NOTAS PAGE ── */
+    .notes-input-row {
+      display:flex; gap:8px; margin-bottom:1rem;
+    }
+    .notes-input {
+      flex:1; padding:0.65rem 0.85rem;
+      border:1.5px solid var(--border2); border-radius:12px;
+      font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;
+      color:var(--text); background:var(--surface2);
+      outline:none; min-height:46px;
+    }
+    .notes-input:focus { border-color:var(--accent); }
+    .notes-add-btn {
+      width:46px; height:46px; border-radius:50%;
+      background:var(--accent); color:#fff; border:none;
+      font-size:22px; font-weight:300; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+    }
+    .checklist { display:flex; flex-direction:column; gap:8px; }
+    .check-item {
+      display:flex; align-items:center; gap:12px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:12px; padding:0.75rem 0.9rem;
+    }
+    .check-box {
+      width:22px; height:22px; border-radius:6px;
+      border:2px solid var(--border2); background:transparent;
+      flex-shrink:0; cursor:pointer; display:flex;
+      align-items:center; justify-content:center;
+      transition:all 0.15s;
+    }
+    .check-box.done { background:var(--accent); border-color:var(--accent); }
+    .check-box.done::after { content:'✓'; color:#fff; font-size:13px; font-weight:800; }
+    .check-text { flex:1; font-size:14px; font-weight:600; color:var(--text); }
+    .check-text.done { text-decoration:line-through; color:var(--text-muted); }
+    .check-del { background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; padding:0; }
+
+    /* ── ESTUDIAR PAGE ── */
+    .study-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.1rem; }
+    .study-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:16px; padding:1rem; text-align:center;
+    }
+    .study-card-label { font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+    .study-card-val { font-family:'Poppins',sans-serif; font-weight:600; font-size:2rem; color:var(--accent); line-height:1; }
+    .study-card-sub { font-size:10px; color:var(--text-muted); font-weight:600; margin-top:4px; }
+    .study-btns { display:flex; gap:8px; margin-bottom:1rem; }
+    .study-btn {
+      flex:1; padding:0.7rem; border-radius:12px;
+      border:1.5px solid var(--border2); background:var(--surface);
+      font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700;
+      color:var(--text); cursor:pointer; min-height:46px;
+      transition:all 0.15s;
+    }
+    .study-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .study-btn:active { opacity:0.8; }
+    .study-notes-area {
+      width:100%; padding:0.85rem;
+      border:1.5px solid var(--border2); border-radius:14px;
+      font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500;
+      color:var(--text); background:var(--surface2);
+      outline:none; resize:none; min-height:140px;
+      line-height:1.6;
+    }
+    .study-notes-area:focus { border-color:var(--accent); }
+
+    /* ── JUEGOS MENU ── */
+    .games-menu { display:flex; flex-direction:column; gap:0.85rem; }
+    .game-card-item {
+      background:var(--surface); border:1.5px solid var(--border);
+      border-radius:18px; overflow:hidden;
+      display:flex; gap:0; flex-direction:column;
+    }
+    .game-card-art {
+      width:100%; height:140px;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+    }
+    .game-card-info {
+      padding:0.9rem 1rem 1rem;
+    }
+    .game-card-name {
+      font-family:'Poppins',sans-serif; font-weight:600;
+      font-size:1.1rem; font-weight:500; color:var(--text);
+      margin-bottom:4px;
+    }
+    .game-card-desc {
+      font-size:12px; font-weight:600;
+      color:var(--text-muted); line-height:1.5;
+      margin-bottom:0.75rem;
+    }
+    .game-card-actions { display:flex; gap:8px; }
+    .game-btn-play {
+      flex:1; padding:0.6rem; border-radius:10px;
+      background:var(--accent); color:#fff; border:none;
+      font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700;
+      cursor:pointer; min-height:40px;
+    }
+    .game-btn-invite {
+      flex:1; padding:0.6rem; border-radius:10px;
+      background:transparent; color:var(--accent);
+      border:2px solid var(--accent);
+      font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700;
+      cursor:pointer; min-height:40px;
+    }
+
+    /* ── JUEGOS PAGE ── */
+    .prox-wrap {
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      height:60vh; gap:1rem; text-align:center;
+    }
+    .prox-icon { font-size:3.5rem; }
+    .prox-title { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.4rem; color:var(--text); }
+    .prox-sub { font-size:13px; color:var(--text-muted); font-weight:600; line-height:1.6; max-width:240px; }
+    .section { display:none; }
+    .section.active { display:block; }
+    .stats-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.6rem; margin-bottom:1.2rem; }
+    .stat-card { background:var(--stat-bg); border-radius:var(--radius); padding:0.75rem 0.5rem; text-align:center; border:1px solid var(--border); }
+    .stat-num { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.6rem; color:var(--accent); display:block; line-height:1; }
+    .stat-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-top:4px; display:block; font-weight:800; }
+    .filter-bar { display:flex; gap:8px; margin-bottom:1.1rem; }
+    .filter-main { display:flex; gap:8px; flex:1; }
+    .filt-btn { flex:1; min-height:54px; border-radius:var(--radius); border:2px solid var(--f-inactive-bdr); background:var(--f-inactive-bg); color:var(--f-inactive-text); font-family:'DM Sans',sans-serif; font-size:11px; font-weight:800; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 4px; transition:all 0.18s; }
+    .filt-btn .fi { font-size:1.4rem; line-height:1; }
+    .filt-btn.active { background:var(--f-active-bg); border-color:var(--f-active-bg); color:var(--f-active-text); box-shadow:0 3px 10px rgba(0,0,0,0.18); }
+    .filt-visited { width:64px; min-height:54px; border-radius:var(--radius); border:2px solid var(--f-inactive-bdr); background:var(--f-inactive-bg); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:6px 4px; position:relative; flex-shrink:0; transition:all 0.18s; }
+    .filt-visited .fv-label { font-size:9px; font-weight:800; color:var(--f-inactive-text); }
+    .filt-visited .fv-badge { position:absolute; top:-7px; right:-7px; background:var(--accent); color:#fff; border-radius:50%; width:20px; height:20px; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; border:2.5px solid var(--bg); }
+    .filt-visited.active { background:var(--f-active-bg); border-color:var(--f-active-bg); box-shadow:0 3px 10px rgba(0,0,0,0.18); }
+    .filt-visited.active .fv-label { color:#fff; }
+    .sec-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
+    .sec-title { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.1rem; color:var(--text); }
+    .btn-add { background:var(--accent); color:#fff; border:none; border-radius:22px; padding:0.5rem 1rem; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; min-height:40px; }
+    .places-list { display:flex; flex-direction:column; gap:0.8rem; }
+    .place-card { background:var(--surface); border:1.5px solid var(--border); border-radius:18px; overflow:hidden; }
+    .place-hd { display:flex; gap:0.8rem; align-items:center; padding:1rem; cursor:pointer; }
+    .place-emoji { width:46px; height:46px; border-radius:13px; background:var(--accent-bg); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0; }
+    .place-info { flex:1; min-width:0; }
+    .place-name { font-weight:800; font-size:15px; color:var(--text); margin-bottom:3px; }
+    .place-desc-s { font-size:12px; color:var(--text-muted); line-height:1.4; font-weight:600; }
+    .place-meta { margin-top:6px; }
+    .tag { border-radius:20px; padding:3px 9px; font-size:10px; font-weight:800; background:var(--tag-bg); color:var(--tag-text); display:inline-block; }
+    .tag.planned { background:var(--green-bg); color:var(--green-text); }
+    .tag.done { background:var(--surface2); color:var(--text-muted); }
+    .chev { font-size:12px; color:var(--text-muted); transition:transform 0.25s; flex-shrink:0; }
+    .place-card.open .chev { transform:rotate(180deg); }
+    .place-dd { max-height:0; overflow:hidden; transition:max-height 0.35s ease; border-top:0px solid var(--border); }
+    .place-card.open .place-dd { max-height:700px; border-top-width:1.5px; }
+    .dd-inner { padding:0.9rem; display:flex; flex-direction:column; gap:8px; }
+    .dd-title { font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; margin-top:4px; }
+    .dd-action { display:flex; align-items:center; gap:12px; padding:0.75rem 0.9rem; border-radius:var(--radius-sm); background:var(--dd-bg); border:1.5px solid var(--dd-border); font-size:14px; font-weight:600; color:var(--text); width:100%; text-align:left; font-family:'DM Sans',sans-serif; cursor:pointer; min-height:48px; }
+    .dd-action.postpone { color:var(--accent); border-color:var(--border2); }
+    .dd-action.danger { color:#8B0010; border-color:rgba(139,0,16,0.22); }
+    [data-theme="purple"] .dd-action.danger { color:#F09595; }
+    .note-area { width:100%; padding:0.7rem 0.85rem; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; color:var(--text); background:var(--surface2); outline:none; resize:none; min-height:80px; margin-top:4px; }
+    .note-area:focus { border-color:var(--accent); background:var(--surface); }
+    .desc-area { width:100%; padding:0.7rem 0.85rem; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; color:var(--text); background:var(--surface2); outline:none; resize:none; min-height:65px; margin-top:4px; }
+    .desc-area:focus { border-color:var(--accent); background:var(--surface); }
+    .save-btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; align-self:flex-end; min-height:38px; }
+    .photos-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:6px; }
+    .photo-thumb { aspect-ratio:1; border-radius:10px; background:var(--surface2); border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:1.4rem; overflow:hidden; position:relative; }
+    .photo-thumb img { width:100%; height:100%; object-fit:cover; border-radius:9px; }
+    .rm-photo { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .upload-btn { aspect-ratio:1; border-radius:10px; background:var(--accent-bg); border:2px dashed var(--accent); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; }
+    .upload-btn span { font-size:10px; color:var(--accent); font-weight:800; }
+    .upload-btn input { display:none; }
+    .vid-ph { background:var(--surface2); border-radius:var(--radius-sm); padding:1rem; text-align:center; margin-top:4px; font-size:13px; color:var(--text-muted); border:1.5px solid var(--border); font-weight:600; }
+    .ideas-intro { background:var(--accent-bg); border-radius:var(--radius); padding:1rem; margin-bottom:1.2rem; font-size:13px; color:var(--text-muted); line-height:1.5; text-align:center; border:1.5px solid var(--border); font-weight:600; }
+    .ideas-intro strong { display:block; font-family:'Poppins',sans-serif; font-weight:600; font-size:1.05rem; color:var(--accent); margin-bottom:3px; }
+    .proposals { display:flex; flex-direction:column; gap:0.8rem; }
+    .prop-card { background:var(--surface); border:1.5px solid var(--border); border-radius:18px; padding:1rem; display:flex; flex-direction:column; gap:0.5rem; }
+    .prop-top { display:flex; justify-content:space-between; align-items:flex-start; }
+    .prop-title { font-weight:800; font-size:15px; color:var(--text); flex:1; padding-right:8px; }
+    .prop-del { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:22px; line-height:1; min-width:32px; min-height:32px; display:flex; align-items:center; justify-content:center; }
+    .prop-desc { font-size:13px; color:var(--text-muted); line-height:1.5; font-weight:600; }
+    .votes-row { display:flex; gap:8px; margin-top:2px; }
+    .vote-pill { flex:1; padding:0.55rem; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:transparent; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; font-weight:700; color:var(--text-muted); min-height:44px; display:flex; align-items:center; justify-content:center; gap:3px; transition:all 0.18s; }
+    .vote-pill.yes.selected { background:var(--green-bg); border-color:var(--green); color:var(--green-text); }
+    [data-theme="rose"] .vote-pill.no.selected { background:#FEE0E4; border-color:#8B0010; color:#6A0008; }
+    [data-theme="purple"] .vote-pill.no.selected { background:#2A0A0A; border-color:#C04040; color:#F09595; }
+    .vote-pill.maybe.selected { background:var(--accent-bg); border-color:var(--accent); color:var(--accent-text); }
+    .prop-footer { display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+    .vote-result { font-size:12px; font-weight:700; color:var(--text-muted); }
+    .prop-who { font-size:11px; font-weight:800; background:var(--tag-bg); color:var(--tag-text); padding:3px 10px; border-radius:20px; }
+    .map-ph { background:var(--surface2); border-radius:18px; height:185px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; margin-bottom:1.2rem; border:1.5px solid var(--border); cursor:pointer; }
+    .map-ph .mi { font-size:2.2rem; }
+    .recs-hd { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; }
+    .recs-title { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.05rem; color:var(--text); }
+    .recs-sub { font-size:11px; color:var(--text-muted); font-weight:600; }
+    .recs-list { display:flex; flex-direction:column; gap:0.7rem; }
+    .rec-card { background:var(--rec-bg); border:1.5px solid var(--rec-border); border-radius:var(--radius); padding:0.9rem; display:flex; gap:0.8rem; align-items:flex-start; }
+    .rec-em { font-size:1.7rem; flex-shrink:0; margin-top:2px; }
+    .rec-info { flex:1; min-width:0; }
+    .rec-name { font-weight:800; font-size:13px; color:var(--text); margin-bottom:2px; }
+    .rec-desc { font-size:12px; color:var(--text-muted); line-height:1.4; margin-bottom:7px; font-weight:600; }
+    .rec-foot { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .rec-badge { background:var(--tag-bg); color:var(--tag-text); border-radius:20px; padding:3px 9px; font-size:10px; font-weight:800; }
+    .rec-badge.offer { background:#FFF0C0; color:#6A4400; }
+    [data-theme="purple"] .rec-badge.offer { background:#2A2010; color:#E8B840; }
+    .rec-dist { font-size:10px; color:var(--text-muted); font-weight:700; }
+    .rec-add { background:var(--accent); color:#fff; border:none; border-radius:20px; padding:4px 12px; font-size:11px; font-weight:700; font-family:'DM Sans',sans-serif; margin-left:auto; flex-shrink:0; min-height:32px; cursor:pointer; }
+    .rec-add.added { background:var(--green); }
+    .recs-note { background:var(--surface2); border-radius:var(--radius-sm); padding:0.85rem; font-size:12px; color:var(--text-muted); text-align:center; border:1.5px dashed var(--border2); margin-top:0.85rem; line-height:1.6; font-weight:600; }
+
+    /* ── MUSIC BUTTON ── */
+    #mk-music {
+      position: fixed;
+      bottom: calc(32px + var(--safe-bottom));
+      right: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1.5px solid var(--border2);
+      border-radius: 50px;
+      box-shadow: -3px 4px 18px rgba(0,0,0,0.18);
+      overflow: hidden;
+      transform: translateX(calc(100% - 36px));
+      transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
+      user-select: none;
+    }
+    #mk-music.open {
+      transform: translateX(0);
+    }
+    #mk-music.dragging {
+      transition: none;
+      transform: translateX(calc(100% - 36px));
+      box-shadow: -3px 8px 28px rgba(0,0,0,0.32);
+      border-color: var(--accent);
+    }
+    #mk-music.dragging #mk-disc {
+      animation: mkPulse 0.6s ease-in-out infinite alternate;
+    }
+    @keyframes mkPulse {
+      from { transform: scale(1); }
+      to   { transform: scale(1.08); }
+    }
+    #mk-disc {
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    #mk-disc svg {
+      width: 72px;
+      height: 72px;
+      display: block;
+    }
+    #mk-music.open #mk-disc svg {
+      animation: mkSpin 3s linear infinite;
+    }
+    @keyframes mkSpin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    #mk-music-label {
+      padding: 0 20px 0 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    #mk-music-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    #mk-music-sub {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 3px;
+      white-space: nowrap;
+    }
+    /* ── MODALS: backdrop separado del sheet ── */
+    .modal-backdrop {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.42);
+      z-index:100;
+      pointer-events:none;
+    }
+    .modal-backdrop.open { display:block; pointer-events:auto; }
+    .modal-sheet {
+      display:none; position:fixed;
+      bottom:0; left:0; right:0;
+      z-index:101;
+      justify-content:center;
+    }
+    .modal-sheet.open { display:flex; }
+    .modal-inner {
+      background: #FFFAFB;
+      width:100%; max-width:430px;
+      max-height:88vh; overflow-y:auto;
+      border-radius:22px 22px 0 0;
+      border:2px solid #B02050;
+      border-bottom:none;
+      padding:1.5rem 1.25rem;
+      padding-bottom:calc(1.5rem + var(--safe-bottom));
+      box-shadow:0 -6px 40px rgba(0,0,0,0.22);
+      -webkit-overflow-scrolling:touch;
+    }
+    body[data-theme="purple"] .modal-inner {
+      background:#160E28;
+      border-color:#A87EF5;
+    }
+    .modal-inner .m-handle { width:40px; height:5px; background:var(--border2); border-radius:3px; margin:-0.5rem auto 1.1rem; }
+    .modal-inner .m-title { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.15rem; color:var(--text); margin-bottom:1.1rem; }
+    .modal-inner .f-group { margin-bottom:0.9rem; }
+    .modal-inner .f-label { display:block; font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:5px; }
+    .modal-inner .f-input,
+    .modal-inner .f-select,
+    .modal-inner .f-textarea {
+      width:100%; padding:0.65rem 0.85rem;
+      border:1.5px solid var(--border2);
+      border-radius:var(--radius-sm);
+      font-family:'DM Sans',sans-serif;
+      font-size:15px; font-weight:600;
+      outline:none; min-height:48px;
+      appearance:none; -webkit-appearance:none;
+    }
+    body[data-theme="rose"] .modal-inner .f-input,
+    body[data-theme="rose"] .modal-inner .f-select,
+    body[data-theme="rose"] .modal-inner .f-textarea {
+      background:#F5D0DC; color:#1A0008; border-color:rgba(140,40,70,0.35);
+    }
+    body[data-theme="purple"] .modal-inner .f-input,
+    body[data-theme="purple"] .modal-inner .f-select,
+    body[data-theme="purple"] .modal-inner .f-textarea {
+      background:#1E1235; color:#EDE8FF; border-color:rgba(160,120,240,0.3);
+    }
+    .modal-inner .f-input:focus,
+    .modal-inner .f-select:focus,
+    .modal-inner .f-textarea:focus { border-color:var(--accent); }
+    .modal-inner .f-textarea { resize:none; min-height:80px; }
+    .m-handle { width:40px; height:5px; background:var(--border2); border-radius:3px; margin:-0.5rem auto 1.1rem; }
+    .m-title { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.15rem; color:var(--text); margin-bottom:1.1rem; }
+    .f-group { margin-bottom:0.9rem; }
+    .f-label { display:block; font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:5px; }
+    .f-input,.f-select,.f-textarea { width:100%; padding:0.65rem 0.85rem; border:1.5px solid var(--border2); border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; color:var(--text); background:var(--bg); outline:none; min-height:48px; appearance:none; -webkit-appearance:none; -webkit-text-fill-color:var(--text); opacity:1; }
+    .f-input:focus,.f-select:focus,.f-textarea:focus { border-color:var(--accent); background:var(--surface); }
+    .f-textarea { resize:none; min-height:80px; }
+    .emoji-row { display:flex; gap:8px; flex-wrap:wrap; }
+    .emoji-opt { width:44px; height:44px; border-radius:11px; border:1.5px solid var(--border); background:var(--surface2); font-size:1.3rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .emoji-opt.sel { border-color:var(--accent); background:var(--accent-bg); }
+
+    /* ── NEW DESTINATION BUTTON ── */
+    .btn-nuevo {
+      display:flex; align-items:center; gap:8px;
+      background:var(--surface);
+      border:1.5px solid var(--border2);
+      border-radius:14px;
+      padding:0.6rem 1rem;
+      font-family:'DM Sans',sans-serif;
+      font-size:14px; font-weight:700;
+      color:var(--text);
+      cursor:pointer;
+      transition:border-color 0.2s, background 0.2s;
+      min-height:44px;
+    }
+    .btn-nuevo:active { background:var(--surface2); border-color:var(--accent); }
+    .btn-nuevo-plus {
+      width:26px; height:26px; border-radius:50%;
+      background:var(--accent); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px; font-weight:300; line-height:1; flex-shrink:0;
+    }
+
+    /* ── PLACE MODAL ── */
+    /* modal-nd uses same modal-backdrop + modal-sheet pattern */
+    .nd-handle {
+      width:40px; height:5px;
+      background:var(--border2); border-radius:3px;
+      margin:1rem auto 1.25rem;
+    }
+    .nd-title {
+      font-family:'Poppins',sans-serif; font-weight:600;
+      font-size:1.2rem; color:var(--text);
+      margin-bottom:1.2rem; text-align:center;
+    }
+    /* Type toggle */
+    .nd-type-row {
+      display:flex; gap:8px; margin-bottom:1.4rem;
+    }
+    .nd-type-btn {
+      flex:1; padding:0.65rem;
+      border-radius:12px;
+      border:2px solid var(--border);
+      background:var(--surface2);
+      font-family:'DM Sans',sans-serif;
+      font-size:13px; font-weight:700;
+      color:var(--text-muted);
+      cursor:pointer; transition:all 0.18s;
+      min-height:48px;
+    }
+    .nd-type-btn.active {
+      border-color:var(--accent);
+      background:var(--accent-bg);
+      color:var(--accent-text);
+    }
+    /* Fields */
+    .nd-group { margin-bottom:1rem; }
+    .nd-label {
+      display:block; font-size:11px; font-weight:800;
+      color:var(--text-muted); text-transform:uppercase;
+      letter-spacing:0.07em; margin-bottom:5px;
+    }
+    .nd-input, .nd-textarea {
+      width:100%; padding:0.7rem 0.9rem;
+      border:1.5px solid var(--border2);
+      border-radius:12px;
+      font-family:'DM Sans',sans-serif;
+      font-size:15px; font-weight:600;
+      color:var(--text);
+      background:var(--bg);
+      outline:none; min-height:50px;
+      appearance:none; -webkit-appearance:none;
+      transition:border-color 0.18s;
+      -webkit-text-fill-color:var(--text);
+      opacity:1;
+    }
+    .nd-input:focus, .nd-textarea:focus {
+      border-color:var(--accent);
+      background:var(--surface);
+      -webkit-text-fill-color:var(--text);
+    }
+    .nd-textarea { resize:none; min-height:85px; }
+    /* ── Botones modales ── */
+    .nd-actions, .modal-inner .m-actions {
+      display:flex; gap:10px; margin-top:1.4rem;
+    }
+    .nd-cancel,
+    .modal-inner .btn-cancel {
+      flex:1; padding:0.8rem; min-height:52px;
+      border:2px solid #C0392B;
+      border-radius:14px; background:transparent;
+      font-family:'DM Sans',sans-serif;
+      font-size:14px; font-weight:800;
+      color:#C0392B; cursor:pointer;
+    }
+    .nd-save,
+    .modal-inner .btn-save {
+      flex:2; padding:0.8rem; min-height:52px;
+      border-radius:14px; background:transparent;
+      font-family:'DM Sans',sans-serif;
+      font-size:14px; font-weight:800;
+      cursor:pointer; transition:background 0.15s;
+    }
+    [data-theme="rose"] .nd-save,
+    [data-theme="rose"] .modal-inner .btn-save {
+      border:2px solid #1A0008;
+      color:#1A0008;
+    }
+    [data-theme="rose"] .nd-save:active,
+    [data-theme="rose"] .modal-inner .btn-save:active { background:#F5D0DC; }
+    [data-theme="purple"] .nd-cancel,
+    [data-theme="purple"] .modal-inner .btn-cancel {
+      border-color:#F09595; color:#F09595;
+    }
+    [data-theme="purple"] .nd-save,
+    [data-theme="purple"] .modal-inner .btn-save {
+      border:2px solid #EDE8FF;
+      color:#EDE8FF;
+    }
+    [data-theme="purple"] .nd-save:active,
+    [data-theme="purple"] .modal-inner .btn-save:active { background:#2A1855; }
+    .m-actions { display:flex; gap:10px; margin-top:1.3rem; }
+    .btn-cancel { flex:1; padding:0.75rem; min-height:50px; border:1.5px solid var(--f-inactive-bdr); border-radius:var(--radius-sm); background:transparent; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; color:var(--text-muted); cursor:pointer; }
+    .btn-save { flex:2; padding:0.75rem; min-height:50px; border:none; border-radius:var(--radius-sm); background:var(--accent); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:800; color:#fff; cursor:pointer; }
+    .empty { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+    .empty .ei { font-size:2.5rem; margin-bottom:0.6rem; }
+    .empty p { font-size:13px; line-height:1.7; font-weight:600; }
+    .ob-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.62); z-index:200; align-items:center; justify-content:center; padding:1.5rem; }
+    .ob-overlay.open { display:flex; }
+    .ob-card { background:var(--surface); border-radius:24px; padding:2rem 1.5rem; width:100%; max-width:360px; border:1.5px solid var(--border2); box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .ob-emoji { font-size:3rem; text-align:center; display:block; margin-bottom:0.8rem; }
+    .ob-title { font-family:'Poppins',sans-serif; font-weight:600; font-size:1.4rem; color:var(--text); text-align:center; margin-bottom:0.4rem; }
+    .ob-sub { font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:1.5rem; line-height:1.6; font-weight:600; }
+    .ob-save { width:100%; padding:0.9rem; border:none; border-radius:14px; background:var(--accent); color:#fff; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:800; cursor:pointer; min-height:52px; }
+    /* AUTH */
+    .auth-overlay { display:none; position:fixed; inset:0; background:var(--bg); z-index:300; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }    .auth-overlay.open { display:flex; }
+    .auth-logo { font-family:'Poppins',sans-serif; font-weight:600; font-size:2rem; color:var(--text); margin-bottom:0.5rem; display:flex; align-items:center; gap:8px; }
+    .auth-logo em { color:var(--accent); font-style:normal; font-weight:700; }
+    .auth-sub { font-size:13px; color:var(--text-muted); font-weight:600; margin-bottom:2rem; text-align:center; }
+    .auth-card { background:var(--surface); border-radius:24px; padding:1.75rem; width:100%; max-width:340px; border:1.5px solid var(--border2); box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .auth-tabs { display:flex; gap:4px; background:var(--surface2); padding:4px; border-radius:10px; margin-bottom:1.25rem; }
+    .auth-tab { flex:1; padding:0.45rem; border:none; background:transparent; border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer; }
+    .auth-tab.active { background:var(--surface); color:var(--text); }
+    .auth-error { background:#FEE0E4; color:#8B0010; border-radius:10px; padding:0.65rem 0.85rem; font-size:13px; font-weight:600; margin-bottom:0.75rem; display:none; }
+    [data-theme="purple"] .auth-error { background:#2A0A0A; color:#F09595; }
+    .spinner { width:20px; height:20px; border:3px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spinnerAnim 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:6px; }
+    @keyframes spinnerAnim { to { transform:rotate(360deg); } }
+    .toast { position:fixed; top:calc(1rem + var(--safe-top)); left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:0.6rem 1.2rem; border-radius:20px; font-size:13px; font-weight:700; z-index:999; opacity:0; transition:opacity 0.2s; pointer-events:none; white-space:nowrap; }
+    .toast.show { opacity:1; }
+  </style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+  <div id="auth-screen" style="display:flex;position:fixed;inset:0;background:#FFF0F4;z-index:9998;flex-direction:column;align-items:center;justify-content:center;padding:2rem;">
+    <div style="font-family:'Poppins',sans-serif; font-weight:600;font-size:2rem;color:#1A0008;margin-bottom:6px">monki<em style="color:#B02050;font-style:normal;font-weight:700">trip</em></div>
+    <div style="font-size:13px;color:#5C1528;font-weight:600;margin-bottom:2rem">Tu planificador de aventuras juntos</div>
+    <div style="background:#FFFAFB;border-radius:24px;padding:1.75rem;width:100%;max-width:340px;border:1.5px solid rgba(140,40,70,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.12)">
+      <div style="display:flex;gap:4px;background:#F5D0DC;padding:4px;border-radius:10px;margin-bottom:1.25rem">
+        <button id="tab-login" style="flex:1;padding:0.45rem;border:none;border-radius:7px;background:#FFFAFB;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:#1A0008;cursor:pointer" onclick="authSetTab('login')">Entrar</button>
+        <button id="tab-register" style="flex:1;padding:0.45rem;border:none;border-radius:7px;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:#5C1528;cursor:pointer" onclick="authSetTab('register')">Registrarse</button>
+      </div>
+      <div id="auth-error" style="display:none;background:#FEE0E4;color:#8B0010;border-radius:10px;padding:0.65rem 0.85rem;font-size:13px;font-weight:600;margin-bottom:0.75rem"></div>
+      <div style="margin-bottom:0.9rem">
+        <div style="font-size:11px;font-weight:800;color:#5C1528;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Email</div>
+        <input id="auth-email" type="email" placeholder="tu@email.com" autocomplete="email" style="width:100%;padding:0.7rem 0.85rem;border:1.5px solid rgba(140,40,70,0.35);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#1A0008;background:#F5D0DC;outline:none;min-height:48px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:0.9rem">
+        <div style="font-size:11px;font-weight:800;color:#5C1528;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Contraseña</div>
+        <input id="auth-pass" type="password" placeholder="········" autocomplete="current-password" style="width:100%;padding:0.7rem 0.85rem;border:1.5px solid rgba(140,40,70,0.35);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#1A0008;background:#F5D0DC;outline:none;min-height:48px;box-sizing:border-box">
+      </div>
+      <div id="auth-name-group" style="display:none;margin-bottom:0.9rem">
+        <div style="font-size:11px;font-weight:800;color:#5C1528;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Tu nombre</div>
+        <input id="auth-name" type="text" placeholder="ej. Víctor" style="width:100%;padding:0.7rem 0.85rem;border:1.5px solid rgba(140,40,70,0.35);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#1A0008;background:#F5D0DC;outline:none;min-height:48px;box-sizing:border-box">
+      </div>
+      <button id="auth-btn" style="width:100%;padding:0.85rem;margin-top:0.5rem;border:none;border-radius:14px;background:#B02050;color:#fff;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:800;cursor:pointer;min-height:52px">Entrar</button>
+    </div>
+  </div>
+
+<div id="app" data-theme="rose">
+
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="header-top">
+      <div class="logo">monki<em>trip</em><span class="logo-v">v0.0.3</span></div>
+      <div class="header-right">
+        <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()">Oscuro</button>
+        <div class="avatar" id="user-avatar" onclick="toggleProfileMenu()">V</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="main-content">
+    <div id="pages-wrap">
+
+      <!-- PAGE 0: NOTAS -->
+      <div class="page" id="page-notas">
+        <div class="sec-header" style="margin-bottom:1rem">
+          <div class="sec-title">Notas</div>
+        </div>
+        <div class="notes-input-row">
+          <input class="notes-input" id="note-input" type="text" placeholder="Agregar tarea..." autocomplete="off">
+          <button class="notes-add-btn" onclick="addNote()">+</button>
+        </div>
+        <div class="checklist" id="checklist"></div>
+      </div>
+
+      <!-- PAGE 1: VIAJES -->
+      <div class="page" id="page-viajes">
+        <div class="nav-tabs" style="margin-bottom:1rem">
+          <button class="nav-tab active" id="vtab-tablero" onclick="showViajesSection('tablero',this)">Tablero</button>
+          <button class="nav-tab" id="vtab-ideas" onclick="showViajesSection('ideas',this)">Ideas</button>
+          <button class="nav-tab" id="vtab-mapa" onclick="showViajesSection('mapa',this)">Mapa</button>
+        </div>
+        <div id="section-tablero">
+          <div class="stats-row">
+            <div class="stat-card"><span class="stat-num" id="cnt-all">0</span><span class="stat-label">Total</span></div>
+            <div class="stat-card"><span class="stat-num" id="cnt-planned">0</span><span class="stat-label">Planeados</span></div>
+            <div class="stat-card"><span class="stat-num" id="cnt-done">0</span><span class="stat-label">Visitados</span></div>
+          </div>
+          <div class="filter-bar">
+            <div class="filter-main">
+              <button class="filt-btn active" id="filt-planned" onclick="setFilter('planned')"><span>Planeados</span></button>
+              <button class="filt-btn" id="filt-dream" onclick="setFilter('dream')"><span>Sueños</span></button>
+            </div>
+            <button class="filt-visited" id="filt-done" onclick="setFilter('done')">
+              <span style="font-size:1.5rem">✉️</span>
+              <span class="fv-label">Visitados</span>
+              <span class="fv-badge" id="fv-badge">0</span>
+            </button>
+          </div>
+          <div class="sec-header">
+            <div class="sec-title" id="list-title">Planeados</div>
+            <button class="btn-nuevo" onclick="openNuevo()">
+              <span class="btn-nuevo-plus">+</span>
+              Nuevo destino
+            </button>
+          </div>
+          <div class="places-list" id="places-list"></div>
+        </div>
+
+        <div id="section-ideas" style="display:none">
+          <div class="ideas-intro"><strong>Propón sin presión</strong>Cada uno propone por separado. Los votos se revelan cuando ambos respondan.</div>
+          <div class="sec-header">
+            <div class="sec-title">Propuestas</div>
+            <button class="btn-add" onclick="openModal('idea')">+ Proponer</button>
+          </div>
+          <div class="proposals" id="proposals-list"></div>
+        </div>
+
+        <div id="section-mapa" style="display:none">
+          <div id="map-container" style="border-radius:18px; overflow:hidden; height:340px; border:2px solid var(--accent); background:var(--surface); margin-bottom:1rem; box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+            <div id="leaflet-map" style="width:100%; height:100%;"></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-bottom:1.2rem;">
+            <button class="study-btn" style="flex:1" onclick="centerOnMe()">Mi ubicación</button>
+            <button class="study-btn" style="flex:1" onclick="fitAllPins()">Ver todos</button>
+          </div>
+          <div class="recs-hd"><div class="recs-title">Recomendaciones</div><span class="recs-sub" id="recs-sub">Cerca de ti</span></div>
+          <div class="recs-list" id="recs-list"></div>
+          <div class="recs-note">Con la próxima actualización, estas recomendaciones serán automáticas según tu ubicación.</div>
+        </div>
+      </div>
+
+      <!-- PAGE 2: ESTUDIAR -->
+      <div class="page" id="page-estudiar">
+        <div class="sec-header" style="margin-bottom:1rem">
+          <div class="sec-title">Estudiar</div>
+        </div>
+
+        <!-- Modo toggle -->
+        <div class="nd-type-row" style="margin-bottom:1rem">
+          <button class="nd-type-btn active" id="mode-normal" onclick="setStudyMode('normal')">Normal</button>
+          <button class="nd-type-btn" id="mode-study" onclick="setStudyMode('study')">Estudio</button>
+        </div>
+
+        <!-- Timer display -->
+        <div class="study-card" style="margin-bottom:0.75rem;text-align:center">
+          <div class="study-card-label" id="timer-phase-label">Temporizador</div>
+          <div class="study-card-val" id="chrono-display" style="font-size:3rem">00:00</div>
+          <div class="study-card-sub" id="chrono-sub">Pausado</div>
+        </div>
+
+        <!-- Modo estudio: config -->
+        <div id="study-config" style="display:none;margin-bottom:0.75rem">
+          <div class="study-grid">
+            <div class="study-card">
+              <div class="study-card-label">Estudio (min)</div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:4px">
+                <button class="study-btn" style="width:34px;min-height:34px;padding:0;flex:none" onclick="adjustTime('work',-5)">−</button>
+                <span class="study-card-val" id="work-time-display">25</span>
+                <button class="study-btn" style="width:34px;min-height:34px;padding:0;flex:none" onclick="adjustTime('work',5)">+</button>
+              </div>
+            </div>
+            <div class="study-card">
+              <div class="study-card-label">Descanso (min)</div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:4px">
+                <button class="study-btn" style="width:34px;min-height:34px;padding:0;flex:none" onclick="adjustTime('break',-5)">−</button>
+                <span class="study-card-val" id="break-time-display">5</span>
+                <button class="study-btn" style="width:34px;min-height:34px;padding:0;flex:none" onclick="adjustTime('break',5)">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contador sesiones -->
+        <div class="study-card" style="margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem">
+          <div>
+            <div class="study-card-label">Sesiones completadas</div>
+            <div class="study-card-val" id="counter-display" style="font-size:1.6rem;text-align:left">0</div>
+          </div>
+          <button class="study-btn" style="width:auto;padding:0.5rem 1rem;flex:none" onclick="incrementCounter()">+1</button>
+        </div>
+
+        <div class="study-btns">
+          <button class="study-btn primary" id="chrono-btn" onclick="toggleChrono()">Iniciar</button>
+          <button class="study-btn" onclick="resetChrono()">Reiniciar</button>
+        </div>
+
+        <!-- Vibración toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0.75rem 1rem;margin-bottom:0.75rem">
+          <span style="font-size:13px;font-weight:700;color:var(--text)">Vibración al terminar</span>
+          <button id="vibration-toggle" onclick="toggleVibration()" style="width:48px;height:26px;border-radius:13px;border:none;cursor:pointer;background:var(--accent);position:relative;transition:background 0.2s">
+            <span id="vibration-knob" style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:right 0.2s"></span>
+          </button>
+        </div>
+
+        <div class="nd-label" style="margin-bottom:6px;margin-top:1rem">Apuntes</div>
+        <textarea class="study-notes-area" id="study-notes" placeholder="Escribe tus apuntes aquí..."></textarea>
+      </div>
+
+      <!-- PAGE 3: JUEGOS -->
+      <div class="page" id="page-juegos">
+        <div class="sec-header" style="margin-bottom:1rem">
+          <div class="sec-title">Juegos</div>
+        </div>
+
+        <div class="nd-type-row" style="margin-bottom:1.25rem">
+          <button class="nd-type-btn active" id="games-btn-solo" onclick="setGamesTab('solo',this)">Solo</button>
+          <button class="nd-type-btn" id="games-btn-juntitos" onclick="setGamesTab('juntitos',this)">Juntitos</button>
+        </div>
+
+        <div id="games-solo">
+          <!-- Menú de juegos Solo -->
+          <div class="games-menu" id="games-solo-menu">
+            <div class="game-card-item" onclick="showToast('Próximamente — juegos para ti solo')">
+              <div class="game-card-art" style="background:linear-gradient(135deg,var(--accent-bg),var(--surface2))">
+                <span style="font-size:3rem">🕹️</span>
+              </div>
+              <div class="game-card-info">
+                <div class="game-card-name">Próximamente</div>
+                <div class="game-card-desc">Juegos para pasar el rato por tu cuenta.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="games-juntitos" style="display:none">
+          <!-- Menú de juegos Juntitos -->
+          <div class="games-menu" id="games-juntitos-menu">
+            <div class="game-card-item">
+              <div class="game-card-art" style="background:linear-gradient(135deg,#1a0a0e,#3d1520)">
+                <span style="font-size:3rem">🃏</span>
+              </div>
+              <div class="game-card-info">
+                <div class="game-card-name">Liar's Bar</div>
+                <div class="game-card-desc">Bluff y ruleta rusa. Di la verdad o muere.</div>
+                <div class="game-card-actions">
+                  <button class="game-btn-play" onclick="openLiarsBar()">Jugar</button>
+                  <button class="game-btn-invite" onclick="inviteToGame('liarsbar','Liar\'s Bar')">Invitar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Liar's Bar game screen (hidden until launched) -->
+          <div id="liarsbar-screen" style="display:none">
+            <div id="liarsbar-lobby">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+                <button class="study-btn" style="padding:6px 12px;min-height:36px;font-size:12px;width:auto" onclick="closeLiarsBar()">← Volver</button>
+                <div class="sec-title">Liar's Bar</div>
+              </div>
+              <div style="text-align:center;padding:1.5rem 0">
+                <div style="font-size:4rem">🃏</div>
+                <div class="prox-title" style="margin:0.5rem 0">Liar's Bar</div>
+                <div class="prox-sub" style="margin:0 auto 1.5rem">Juego de bluff y ruleta rusa para dos. ¿Quién miente más?</div>
+                <button class="nd-save" style="width:100%;max-width:280px" onclick="startLiarsBar()">Comenzar partida</button>
+              </div>
+            </div>
+
+            <div id="liarsbar-game" style="display:none">
+            <!-- Header info -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+              <div class="sec-title">Liar's Bar</div>
+              <button class="study-btn" style="padding:6px 14px;min-height:36px;font-size:12px" onclick="resetLiarsBar()">Nueva partida</button>
+            </div>
+
+            <!-- Mesa -->
+            <div class="study-card" style="text-align:center;margin-bottom:0.75rem;padding:0.75rem">
+              <div class="study-card-label">Carta de mesa</div>
+              <div id="lb-table-card" style="font-size:2rem;font-weight:800;color:var(--accent);line-height:1.2">—</div>
+              <div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-top:2px">Todas las cartas jugadas deben ser esta</div>
+            </div>
+
+            <!-- Jugadores -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+              <!-- J1 -->
+              <div class="study-card" id="lb-p1-card">
+                <div class="study-card-label" id="lb-p1-name">Jugador 1</div>
+                <div style="display:flex;justify-content:center;gap:4px;margin:6px 0" id="lb-p1-revolver">
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);font-weight:700" id="lb-p1-cards-count">5 cartas</div>
+              </div>
+              <!-- J2 -->
+              <div class="study-card" id="lb-p2-card">
+                <div class="study-card-label" id="lb-p2-name">Jugador 2</div>
+                <div style="display:flex;justify-content:center;gap:4px;margin:6px 0" id="lb-p2-revolver">
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);font-weight:700" id="lb-p2-cards-count">5 cartas</div>
+              </div>
+            </div>
+
+            <!-- Turno actual -->
+            <div class="study-card" id="lb-turn-panel" style="margin-bottom:0.75rem">
+              <div class="study-card-label" id="lb-turn-label">Turno de</div>
+              <div style="font-size:15px;font-weight:800;color:var(--text);margin:6px 0" id="lb-turn-instruction"></div>
+              <!-- Mano de cartas (solo visible para el jugador activo) -->
+              <div id="lb-hand" style="display:none;margin-top:10px">
+                <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Tus cartas — elige 1 a 3</div>
+                <div id="lb-hand-cards" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+                <div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-top:6px" id="lb-selected-info">Ninguna seleccionada</div>
+              </div>
+            </div>
+
+            <!-- Log de la última jugada -->
+            <div id="lb-last-play" style="display:none;background:var(--accent-bg);border:1.5px solid var(--border2);border-radius:12px;padding:0.75rem 1rem;margin-bottom:0.75rem;font-size:13px;font-weight:700;color:var(--text);text-align:center"></div>
+
+            <!-- Botones de acción -->
+            <div id="lb-actions" style="display:flex;flex-direction:column;gap:8px"></div>
+
+            <!-- Resultado de ruleta -->
+            <div id="lb-roulette-result" style="display:none;text-align:center;padding:1.5rem;border-radius:16px;margin-top:0.75rem"></div>
+          </div><!-- end liarsbar-game -->
+          </div><!-- end liarsbar-screen -->
+        </div><!-- end games-juntitos -->
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- BOTTOM NAV -->
+  <nav id="bottom-nav">
+    <button class="bnav-item" id="bnav-notas" onclick="goPage(0)">
+      <div class="bnav-icon">📝</div>
+      <span class="bnav-label">Notas</span>
+    </button>
+    <button class="bnav-item" id="bnav-viajes" onclick="goPage(1)">
+      <div class="bnav-icon">✈️</div>
+      <span class="bnav-label">Viajes</span>
+    </button>
+    <button class="bnav-item" id="bnav-estudiar" onclick="goPage(2)">
+      <div class="bnav-icon">📚</div>
+      <span class="bnav-label">Estudiar</span>
+    </button>
+    <button class="bnav-item" id="bnav-juegos" onclick="goPage(3)">
+      <div class="bnav-icon">🎮</div>
+      <span class="bnav-label">Juegos</span>
+    </button>
+  </nav>
+
+  <!-- MUSIC persiste en todas las páginas -->
+  <div id="mk-music" onclick="handleMusicClick()">
+    <div id="mk-disc">
+      <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="36" cy="36" r="36" fill="#1a0a0e"/>
+        <circle cx="36" cy="36" r="33" fill="none" stroke="#2a1015" stroke-width="2"/>
+        <circle cx="36" cy="36" r="29" fill="none" stroke="#2a1015" stroke-width="2"/>
+        <circle cx="36" cy="36" r="25" fill="none" stroke="#2a1015" stroke-width="2"/>
+        <circle cx="36" cy="36" r="21" fill="none" stroke="#2a1015" stroke-width="2"/>
+        <circle cx="36" cy="36" r="17" fill="none" stroke="#2a1015" stroke-width="2"/>
+        <circle cx="36" cy="36" r="13" fill="none" stroke="#2a1015" stroke-width="2"/>
+        <circle cx="36" cy="36" r="12" fill="#B02050"/>
+        <circle cx="36" cy="36" r="10" fill="#C4325E"/>
+        <circle cx="36" cy="36" r="8"  fill="#B02050"/>
+        <circle cx="36" cy="36" r="4"  fill="#1a0a0e"/>
+        <circle cx="36" cy="36" r="2"  fill="#555"/>
+      </svg>
+    </div>
+    <div id="mk-music-label">
+      <div id="mk-music-title">Conectar Spotify</div>
+      <div id="mk-music-sub">Disfruta tu música</div>
+    </div>
+  </div>
+
+  <!-- PROFILE MENU -->
+  <div class="profile-menu-overlay" id="profile-menu-overlay" onclick="closeProfileMenu()"></div>
+  <div class="profile-menu" id="profile-menu" style="display:none">
+    <div class="profile-menu-header">
+      <div class="profile-menu-name" id="pm-name">—</div>
+      <div class="profile-menu-email" id="pm-email">—</div>
+    </div>
+    <button class="profile-menu-item" onclick="closeProfileMenu();openEditProfile()">Editar perfil</button>
+    <button class="profile-menu-item" onclick="closeProfileMenu();showToast('Próximamente: notificaciones')">Notificaciones</button>
+    <button class="profile-menu-item" onclick="closeProfileMenu();showToast('Próximamente: privacidad')">Privacidad</button>
+    <div class="profile-menu-divider"></div>
+    <button class="profile-menu-item danger" id="btn-signout" onclick="doSignOut()">Cerrar sesión</button>
+  </div>
+
+</div>
+
+
+
+<!-- EDIT PROFILE MODAL -->
+<div class="modal-backdrop" id="backdrop-editprofile" onclick="closeEditProfile()"></div>
+<div class="modal-sheet" id="modal-editprofile">
+  <div class="modal-inner">
+    <div class="m-handle"></div>
+    <div class="m-title">Editar perfil</div>
+
+    <!-- Avatar with photo -->
+    <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem">
+      <div style="position:relative;width:88px;height:88px">
+        <div id="ep-avatar-wrap" style="width:88px;height:88px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;overflow:hidden;border:3px solid var(--accent)">
+          <img id="ep-avatar-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;border-radius:50%">
+          <span id="ep-avatar-initial" style="font-size:2.2rem;font-weight:800;color:var(--accent-text)">V</span>
+        </div>
+        <button type="button" onclick="document.getElementById('ep-photo-input').click()" style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;padding:0;color:#fff">
+          ✏️
+        </button>
+        <input type="file" accept="image/*" id="ep-photo-input" style="display:none">
+      </div>
+      <div id="ep-upload-status" style="font-size:11px;color:var(--text-muted);font-weight:600;margin-top:8px"></div>
+    </div>
+
+    <div class="f-group">
+      <label class="f-label">Nombre</label>
+      <input type="text" class="f-input" id="ep-name" placeholder="Tu nombre" autocomplete="given-name">
+    </div>
+    <div class="f-group">
+      <label class="f-label">Fecha de cumpleaños</label>
+      <input type="date" class="f-input" id="ep-bday">
+    </div>
+
+    <div class="nd-actions">
+      <button class="nd-cancel" onclick="closeEditProfile()">Cancelar</button>
+      <button class="nd-save" onclick="saveEditProfile()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPOTIFY MODAL -->
+<div class="modal-backdrop" id="backdrop-spotify" onclick="closeSpotifyModal()"></div>
+<div class="modal-sheet" id="modal-spotify">
+  <div class="modal-inner" style="text-align:center">
+    <div class="m-handle"></div>
+    <div style="font-size:3rem;margin:0.5rem 0">🎵</div>
+    <div class="m-title">Conectar Spotify</div>
+    <div style="font-size:13px;color:var(--text-muted);font-weight:600;line-height:1.6;margin-bottom:1.5rem">
+      Próximamente podrás conectar tu cuenta de Spotify para ver la canción que suena y controlar la música desde Monkitrip.
+    </div>
+    <div style="background:var(--surface2);border-radius:14px;padding:1rem;margin-bottom:1.25rem;border:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">En desarrollo</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.5">Ver canción actual · Pausar/Reproducir · Siguiente canción · Compartir musiquita</div>
+    </div>
+    <button class="nd-save" style="width:100%;opacity:0.5;cursor:not-allowed" disabled>Conectar Spotify — próximamente</button>
+    <button class="nd-cancel" style="width:100%;margin-top:8px" onclick="closeSpotifyModal()">Cerrar</button>
+  </div>
+</div>
+
+<!-- INVITE MODAL -->
+<div class="modal-backdrop" id="backdrop-invite" onclick="rejectInvite()"></div>
+<div class="modal-sheet" id="modal-invite">
+  <div class="modal-inner">
+    <div class="m-handle"></div>
+    <div style="text-align:center;padding:0.5rem 0 1rem">
+      <div style="font-size:3rem">🎮</div>
+      <div class="m-title" style="margin-bottom:4px">¡Invitación recibida!</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text-muted)" id="invite-msg">¿Juguemos Liar's Bar?</div>
+    </div>
+    <div class="nd-actions">
+      <button class="nd-cancel" onclick="rejectInvite()">Rechazar</button>
+      <button class="nd-save" onclick="acceptInvite()">¡Jugar!</button>
+    </div>
+  </div>
+</div>
+
+<!-- WAITING SCREEN -->
+<div class="modal-backdrop" id="backdrop-waiting"></div>
+<div class="modal-sheet" id="modal-waiting">
+  <div class="modal-inner" style="text-align:center">
+    <div class="m-handle"></div>
+    <div style="font-size:3rem;margin:0.5rem 0">⏳</div>
+    <div class="m-title">Esperando respuesta...</div>
+    <div style="font-size:13px;color:var(--text-muted);font-weight:600;margin:0.5rem 0 1.5rem" id="waiting-msg">Invitación enviada</div>
+    <button class="nd-cancel" style="width:100%" onclick="cancelInvite()">Cancelar invitación</button>
+  </div>
+</div>
+
+<!-- MODAL LUGAR -->
+<div class="modal-backdrop" id="backdrop-nd" onclick="closeNuevo()"></div>
+<div class="modal-sheet" id="modal-nd">
+  <div class="modal-inner">
+    <div class="m-handle"></div>
+    <div class="m-title">Nuevo destino</div>
+
+    <div class="nd-type-row">
+      <button class="nd-type-btn active" id="nd-btn-planned" onclick="ndSetType('planned')">📍 Planeado</button>
+      <button class="nd-type-btn"        id="nd-btn-dream"   onclick="ndSetType('dream')">💭 Sueño</button>
+    </div>
+
+    <div class="nd-group">
+      <label class="nd-label">Destino</label>
+      <input class="f-input" id="nd-name" type="text" placeholder="ej. Pucón, Valdivia..." autocomplete="off">
+    </div>
+
+    <div class="nd-group">
+      <label class="nd-label">Descripción</label>
+      <textarea class="f-textarea" id="nd-desc" placeholder="¿Qué lo hace especial?"></textarea>
+    </div>
+
+    <div class="nd-group" id="nd-date-group">
+      <label class="nd-label">Fecha</label>
+      <input class="f-input" id="nd-date" type="date">
+    </div>
+
+    <div class="nd-actions">
+      <button class="nd-cancel" onclick="closeNuevo()">Cancelar</button>
+      <button class="nd-save"   onclick="saveNuevo()">Crear plan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IDEA -->
+<div class="modal-backdrop" id="backdrop-idea" onclick="closeModal('idea')"></div>
+<div class="modal-sheet" id="modal-idea">
+  <div class="modal-inner">
+    <div class="m-handle"></div>
+    <div class="m-title">Nueva propuesta</div>
+    <div class="f-group"><label class="f-label">¿Qué propones?</label><input type="text" class="f-input" id="idea-title" placeholder="ej. Fin de semana en la playa" autocomplete="off"></div>
+    <div class="f-group"><label class="f-label">Cuéntame más</label><textarea class="f-textarea" id="idea-desc" placeholder="Detalles, fechas tentativas..."></textarea></div>
+    <div class="m-actions">
+      <button class="btn-cancel" onclick="closeModal('idea')">Cancelar</button>
+      <button class="btn-save" onclick="saveIdea()">Proponer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Global error catcher — shows JS errors on screen for debugging
+window.onerror = function(msg, src, line, col, err){
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#8B0010;color:#fff;padding:12px;font-size:12px;z-index:9999;word-break:break-all;';
+  div.textContent = `JS ERROR: ${msg} (line ${line})`;
+  document.body.appendChild(div);
+  setTimeout(()=>div.remove(), 8000);
+  return false;
+};
+window.addEventListener('unhandledrejection', e=>{
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:40px;left:0;right:0;background:#8B0010;color:#fff;padding:12px;font-size:12px;z-index:9999;word-break:break-all;';
+  div.textContent = `PROMISE ERROR: ${e.reason?.message || e.reason}`;
+  document.body.appendChild(div);
+  setTimeout(()=>div.remove(), 8000);
+});
+// ─── SUPABASE ──────────────────────────────────────
+const SUPA_URL = 'https://pmmbwadfxzzbubsxmxnm.supabase.co';
+
+// Safe JSON parsing for localStorage values that may be corrupted/missing
+function safeParse(key, fallback){
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch(e){
+    console.error('safeParse error for key:', key, e);
+    return fallback;
+  }
+}
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbWJ3YWRmeHp6YnVic3hteG5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MDEzNzIsImV4cCI6MjA5NjM3NzM3Mn0.rRsmwUtO_tKYO3qZJ3HFOqZ05kQ8hdKdmOfZB9YcYdI';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY, {
+  realtime: {
+    params: { eventsPerSecond: 10 }
+  },
+  global: {
+    fetch: (...args) => {
+      // Add a 12 second timeout to all fetch calls so they never hang forever
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      return fetch(args[0], { ...args[1], signal: controller.signal })
+        .finally(() => clearTimeout(timer));
+    }
+  }
+});
+
+// ─── STATE ─────────────────────────────────────────
+let currentUser = null;
+let currentProfile = null;
+let places = [];
+let ideas = [];
+let myVotes = {};
+let filter = 'planned';
+let selE = '🏖️';
+let openId = null;
+let mTimer = null;
+let authMode = 'login';
+
+// RECS ahora se obtienen dinámicamente vía Overpass API (ver función fetchNearbyRecs)
+let RECS = [];
+let recsLoading = false;
+let lastRecsCoords = null;
+
+const ftitles = {planned:'Planeados', dream:'Sueños', done:'Visitados'};
+const fempty  = {planned:'Agrega tu primer destino planeado.', dream:'Agrega un sueño de viaje.', done:'Aquí aparecerán los lugares que visiten juntos.'};
+const femoji  = {planned:'', dream:'', done:'✉️'};
+
+// ─── TOAST ─────────────────────────────────────────
+function showToast(msg, duration=2500){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), duration);
+}
+
+// ─── AUTH ──────────────────────────────────────────
+function authSetTab(mode){
+  authMode = mode;
+  document.getElementById('auth-name-group').style.display = mode==='register' ? 'block' : 'none';
+  document.getElementById('auth-btn').textContent = mode==='register' ? 'Crear cuenta' : 'Entrar';
+  document.getElementById('auth-error').style.display = 'none';
+  const loginTab = document.getElementById('tab-login');
+  const regTab = document.getElementById('tab-register');
+  if(loginTab){ loginTab.style.background = mode==='login' ? '#FFFAFB' : 'transparent'; loginTab.style.color = mode==='login' ? '#1A0008' : '#5C1528'; }
+  if(regTab){ regTab.style.background = mode==='register' ? '#FFFAFB' : 'transparent'; regTab.style.color = mode==='register' ? '#1A0008' : '#5C1528'; }
+}
+
+// Legacy alias
+function switchAuthTab(mode, btn){ authSetTab(mode); }
+
+let authInProgress = false;
+
+async function handleAuth(){
+  if(authInProgress) return;
+  authInProgress = true;
+
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const btn   = document.getElementById('auth-btn');
+  const errEl = document.getElementById('auth-error');
+  if(!email||!pass){showAuthError('Completa todos los campos.'); authInProgress=false; return;}
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  errEl.style.display = 'none';
+  try {
+    if(authMode==='register'){
+      const name = document.getElementById('auth-name').value.trim();
+      if(!name){showAuthError('Ingresa tu nombre.'); return;}
+      const {data,error} = await sb.auth.signUp({email,password:pass});
+      if(error) throw error;
+      if(data.user){
+        await sb.from('profiles').upsert({id:data.user.id, name, theme:'rose'});
+        showToast('¡Cuenta creada! Iniciando sesión...');
+        document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
+        await sb.auth.signInWithPassword({email,password:pass});
+      } else {
+        showToast('¡Cuenta creada! Ya puedes entrar.');
+      }
+    } else {
+      const {error} = await sb.auth.signInWithPassword({email,password:pass});
+      if(error) throw error;
+    }
+  } catch(e){
+    showAuthError(e.message==='Invalid login credentials'?'Email o contraseña incorrectos.':e.message);
+  } finally {
+    btn.innerHTML = authMode==='register'?'Crear cuenta':'Entrar';
+    btn.disabled = false;
+    authInProgress = false;
+  }
+}
+
+function showAuthError(msg){
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function toggleProfileMenu(){
+  const menu = document.getElementById('profile-menu');
+  const overlay = document.getElementById('profile-menu-overlay');
+  const isOpen = menu.style.display !== 'none';
+  if(isOpen){ closeProfileMenu(); }
+  else {
+    menu.style.display = 'block';
+    overlay.classList.add('open');
+    // Populate
+    document.getElementById('pm-name').textContent = currentProfile?.name || 'Usuario';
+    document.getElementById('pm-email').textContent = currentUser?.email || '';
+  }
+}
+
+function closeProfileMenu(){
+  document.getElementById('profile-menu').style.display = 'none';
+  document.getElementById('profile-menu-overlay').classList.remove('open');
+}
+
+// ─── INIT ──────────────────────────────────────────
+// ── BOTTOM NAV & SWIPE PAGES ──────────────────────
+const PAGE_IDS = ['notas','viajes','estudiar','juegos'];
+let currentPage = 1;
+
+function goPage(idx){
+  currentPage = idx;
+  document.getElementById('pages-wrap').style.transform = `translateX(-${idx * 25}%)`;
+  PAGE_IDS.forEach((id,i)=>{
+    document.getElementById('bnav-'+id).classList.toggle('active', i===idx);
+  });
+}
+
+// Inicializar en Viajes al cargar
+document.addEventListener('DOMContentLoaded', ()=>{
+  goPage(1);
+  closeAllModals();
+  initMusicDrag();
+
+  // Handle app state changes (background/foreground)
+  const CapAppDom = window.Capacitor?.Plugins?.App;
+  if(CapAppDom){
+    CapAppDom.addListener('appStateChange', ({ isActive }) => {
+      if(!isActive){
+        // Going to background: disconnect realtime cleanly
+        try {
+          if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+          sb.realtime.disconnect();
+        } catch(e){}
+      } else {
+        // Returning to foreground: sync timer and reconnect realtime
+        syncChronoFromBackground();
+        setTimeout(()=>{
+          try { if(currentUser){ subscribeRealtime(); } } catch(e){}
+        }, 2000);
+      }
+    });
+  }
+
+  // Bind auth button
+  const authBtn = document.getElementById('auth-btn');
+  if(authBtn){
+    let authTouched = false;
+    authBtn.addEventListener('touchend', e=>{
+      e.preventDefault();
+      authTouched = true;
+      handleAuth();
+      setTimeout(()=>{ authTouched = false; }, 500);
+    });
+    authBtn.addEventListener('click', e=>{
+      if(authTouched) return;
+      handleAuth();
+    });
+  }
+
+  // Double back press to exit
+  const HOME_PAGE = 1;
+  let backPressedOnce = false;
+  let backTimer = null;
+  const CapApp = window.Capacitor?.Plugins?.App;
+  if(CapApp){
+    CapApp.addListener('backButton', ()=>{
+      // Close any open modal — dynamic detection via .modal-sheet.open class
+      const openModal = document.querySelector('.modal-sheet.open');
+      if(openModal){ closeAllModals(); return; }
+
+      // Close profile menu if open (safe null check)
+      const profileMenu = document.getElementById('profile-menu');
+      if(profileMenu && profileMenu.style.display !== 'none'){
+        closeProfileMenu();
+        return;
+      }
+
+      // Navigate back to home page if elsewhere
+      if(currentPage !== HOME_PAGE){ goPage(HOME_PAGE); return; }
+
+      // Double press to exit
+      if(backPressedOnce){ CapApp.exitApp(); return; }
+      backPressedOnce = true;
+      showToast('Presiona de nuevo para salir');
+      clearTimeout(backTimer);
+      backTimer = setTimeout(()=>{ backPressedOnce = false; }, 2000);
+    });
+  }
+});
+
+// Touch swipe
+(function(){
+  const wrap = document.getElementById('pages-wrap');
+  let startX=0, startY=0, dragging=false;
+  wrap.addEventListener('touchstart', e=>{
+    // Don't hijack touches inside the map
+    if(e.target.closest && e.target.closest('#map-container')){
+      dragging = false;
+      return;
+    }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragging = true;
+  }, {passive:true});
+  wrap.addEventListener('touchend', e=>{
+    if(!dragging) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50){
+      if(dx < 0 && currentPage < 3) goPage(currentPage+1);
+      if(dx > 0 && currentPage > 0) goPage(currentPage-1);
+    }
+    dragging = false;
+  }, {passive:true});
+})();
+
+// ── NOTAS ─────────────────────────────────────────
+let notes = safeParse('mk_notes', []);
+
+function renderNotes(){
+  const list = document.getElementById('checklist');
+  if(!list) return;
+  if(!notes.length){
+    list.innerHTML='<div class="empty"><p>Agrega tu primera tarea.</p></div>';
+    return;
+  }
+  list.innerHTML = notes.map((n,i)=>`
+    <div class="check-item">
+      <div class="check-box${n.done?' done':''}" onclick="toggleNote(${i})"></div>
+      <span class="check-text${n.done?' done':''}">${n.text}</span>
+      <button class="check-del" onclick="deleteNote(${i})">×</button>
+    </div>`).join('');
+}
+
+function addNote(){
+  const inp = document.getElementById('note-input');
+  const text = inp.value.trim();
+  if(!text) return;
+  notes.unshift({text, done:false});
+  localStorage.setItem('mk_notes', JSON.stringify(notes));
+  inp.value='';
+  renderNotes();
+}
+
+function toggleNote(i){
+  notes[i].done = !notes[i].done;
+  localStorage.setItem('mk_notes', JSON.stringify(notes));
+  renderNotes();
+}
+
+function deleteNote(i){
+  notes.splice(i,1);
+  localStorage.setItem('mk_notes', JSON.stringify(notes));
+  renderNotes();
+}
+
+document.getElementById('note-input')?.addEventListener('keydown', e=>{ if(e.key==='Enter') addNote(); });
+
+// ── ESTUDIAR ──────────────────────────────────────
+let chronoRunning=false, chronoSecs=0, chronoInterval=null;
+let sessionCount = parseInt(localStorage.getItem('mk_sessions')||'0');
+
+// Persist study notes
+document.getElementById('study-notes')?.addEventListener('input', function(){
+  localStorage.setItem('mk_study_notes', this.value);
+});
+
+function loadStudyData(){
+  const notes = localStorage.getItem('mk_study_notes')||'';
+  const el = document.getElementById('study-notes');
+  if(el) el.value=notes;
+  const cnt=document.getElementById('counter-display');
+  if(cnt) cnt.textContent=sessionCount;
+  updateChronoDisplay();
+  showViajesSection('tablero', null);
+  renderNotes();
+  initVibrationToggle();
+}
+
+let appInitialized = false;
+let realtimeChannel = null;
+
+async function init(){
+  const theme = localStorage.getItem('mk_theme')||'rose';
+  applyTheme(theme);
+
+  // Bug 2 fix: getSession() first — onAuthStateChange doesn't always fire
+  // on cold start (process killed + restarted) in Capacitor/Android
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if(session?.user){
+      currentUser = session.user;
+      document.getElementById('auth-screen').classList.add('hidden');
+      await loadProfile();
+      await loadAll();
+      if(!appInitialized){
+        // Bug 3 fix: clean stale channel before resubscribing
+        if(realtimeChannel){ await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+        setTimeout(()=>{ subscribeRealtime(); }, 3000);
+        setTimeout(()=>{ initFCM(); }, 2000);
+        appInitialized = true;
+      }
+    }
+  } catch(e){ console.error('getSession error', e); }
+
+  // Keep onAuthStateChange for login/logout events only
+  sb.auth.onAuthStateChange(async (event, session)=>{
+    if(event === 'INITIAL_SESSION') return; // already handled by getSession above
+    if(session?.user){
+      currentUser = session.user;
+      document.getElementById('auth-screen').classList.add('hidden');
+      await loadProfile();
+      await loadAll();
+      if(!appInitialized){
+        if(realtimeChannel){ await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+        setTimeout(()=>{ subscribeRealtime(); }, 1500);
+        setTimeout(()=>{ initFCM(); }, 1000);
+        appInitialized = true;
+      }
+    } else {
+      document.getElementById('auth-screen').classList.remove('hidden');
+      appInitialized = false;
+      if(realtimeChannel){
+        sb.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+    }
+  });
+}
+
+// ── ONESIGNAL PUSH NOTIFICATIONS ─────────────────
+async function initFCM(){
+  try {
+    // OneSignal Cordova plugin is available via window.plugins.OneSignal
+    const OS = window.plugins?.OneSignal;
+    if(!OS){
+      console.log('OneSignal plugin not found — running in browser?');
+      return;
+    }
+
+    // Initialize with App ID
+    OS.setAppId('0d0e8aeb-4a9d-44e0-bdde-a468d052cdea');
+
+    // Request permission
+    OS.promptForPushNotificationsWithUserResponse(accepted => {
+      console.log('OneSignal permission:', accepted);
+    });
+
+    // Get Player ID and save to Supabase
+    OS.getDeviceState(state => {
+      const playerId = state?.userId;
+      if(playerId && currentUser){
+        sb.from('push_tokens').upsert({
+          user_id: currentUser.id,
+          token: playerId,
+          updated_at: new Date().toISOString()
+        });
+        localStorage.setItem('os_player_id', playerId);
+      }
+    });
+
+    // Handle notification opened while app is in background/closed
+    OS.setNotificationOpenedHandler(data => {
+      const gameId = data?.notification?.additionalData?.gameId;
+      if(gameId === 'liarsbar'){
+        goPage(3);
+        setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
+        openLiarsBar();
+      }
+    });
+
+    // Handle notification received while app is open
+    OS.setNotificationWillShowInForegroundHandler(event => {
+      const body = event?.getNotification()?.body || '';
+      if(body) showToast(body);
+      event.complete(event.getNotification());
+    });
+
+  } catch(e){
+    console.error('OneSignal error:', e);
+  }
+}
+
+async function loadProfile(){
+  try {
+    const {data, error} = await timeoutPromise(
+      sb.from('profiles').select('*').eq('id', currentUser.id).single(),
+      8000, 'loadProfile'
+    );
+    if(error || !data) return;
+    currentProfile = data;
+    const name = data?.name || '?';
+    const photoUrl = data?.photo_url || null;
+    updateAvatarUI(name, photoUrl);
+    if(data?.theme) applyTheme(data.theme);
+  } catch(e){
+    console.error('loadProfile failed:', e.message);
+  }
+}
+
+function closeAllModals(){
+  ['backdrop-editprofile','backdrop-invite','backdrop-waiting','backdrop-nd','backdrop-idea','backdrop-spotify'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('open');
+  });
+  ['modal-editprofile','modal-invite','modal-waiting','modal-nd','modal-idea','modal-spotify'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('open');
+  });
+  const pw = document.getElementById('profile-menu');
+  if(pw) pw.style.display='none';
+  const po = document.getElementById('profile-menu-overlay');
+  if(po) po.classList.remove('open');
+  // NOTE: never touch auth-screen here
+}
+
+async function signOut(){
+  closeAllModals();
+  await sb.auth.signOut();
+  currentUser = null;
+  currentProfile = null;
+  places = []; ideas = []; myVotes = {};
+  const av = document.getElementById('user-avatar');
+  if(av) av.innerHTML = '?';
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+
+async function saveProfile(){
+  const name = document.getElementById('ob-name').value.trim();
+  const bday = document.getElementById('ob-bday').value;
+  if(!name){document.getElementById('ob-name').focus();return;}
+  const theme = document.getElementById('app').dataset.theme;
+  await sb.from('profiles').upsert({id:currentUser.id, name, birthday:bday||null, theme});
+  currentProfile = {id:currentUser.id, name, birthday:bday, theme};
+  document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
+  document.getElementById('onboarding').classList.remove('open');
+  showToast('¡Perfil guardado!');
+}
+
+// ─── REALTIME ──────────────────────────────────────
+function subscribeRealtime(){
+  realtimeChannel = sb.channel('monkitrip')
+    .on('postgres_changes',{event:'*',schema:'public',table:'places'},()=>loadPlaces())
+    .on('postgres_changes',{event:'*',schema:'public',table:'ideas'},()=>loadIdeas())
+    .on('postgres_changes',{event:'*',schema:'public',table:'idea_votes'},()=>loadIdeas())
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'game_invites',filter:`to_user=eq.${currentUser.id}`}, e=>handleIncomingInvite(e.new))
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'game_invites',filter:`from_user=eq.${currentUser.id}`}, e=>handleInviteResponse(e.new))
+    .subscribe();
+}
+
+// ─── LOAD DATA ─────────────────────────────────────
+async function loadAll(){ await Promise.all([loadPlaces(), loadIdeas()]); renderRecs(); }
+
+async function loadPlaces(){
+  try {
+    const {data} = await timeoutPromise(
+      sb.from('places').select('*, place_photos(id,url)').order('created_at',{ascending:false}),
+      8000, 'loadPlaces'
+    );
+    places = data||[];
+    renderPlaces();
+    if(leafletMap) renderMapPins();
+  } catch(e){ console.error('loadPlaces failed:', e.message); }
+}
+
+async function loadIdeas(){
+  try {
+    const [{data:ideasData},{data:votesData}] = await Promise.all([
+      timeoutPromise(sb.from('ideas').select('*, profiles(name)').order('created_at',{ascending:false}), 8000, 'loadIdeas'),
+      timeoutPromise(sb.from('idea_votes').select('*').eq('user_id', currentUser.id), 8000, 'loadVotes')
+    ]);
+    ideas = ideasData||[];
+    myVotes = {};
+    (votesData||[]).forEach(v=>{ myVotes[v.idea_id]=v.vote; });
+    renderIdeas();
+  } catch(e){ console.error('loadIdeas failed:', e.message); }
+}
+
+// ─── THEME ─────────────────────────────────────────
+function applyTheme(t){
+  document.getElementById('app').dataset.theme = t;
+  document.body.dataset.theme = t;
+  document.getElementById('theme-toggle').textContent = t==='rose'?'Oscuro':'Rosa';
+  const m = document.getElementById('theme-meta');
+  if(m) m.content = t==='rose'?'#B02050':'#0E0A1A';
+  localStorage.setItem('mk_theme', t);
+}
+async function toggleTheme(){
+  const t = document.getElementById('app').dataset.theme==='rose'?'purple':'rose';
+  applyTheme(t);
+  if(currentUser) await sb.from('profiles').update({theme:t}).eq('id',currentUser.id);
+}
+
+// ─── NAV ───────────────────────────────────────────
+// ── SIGN OUT (wrapper to avoid closure issues) ────
+function doSignOut(){
+  closeProfileMenu();
+  setTimeout(async ()=>{
+    await sb.auth.signOut();
+    currentUser = null;
+    currentProfile = null;
+    places = []; ideas = []; myVotes = {};
+    const av = document.getElementById('user-avatar');
+    if(av){ av.innerHTML = '?'; }
+    document.getElementById('auth-screen').classList.remove('hidden');
+  }, 100);
+}
+
+// ── EDIT PROFILE ──────────────────────────────────
+let pendingPhotoUrl = null;
+
+function openEditProfile(){
+  const name = currentProfile?.name || '';
+  const bday = currentProfile?.birthday || '';
+  const photoUrl = currentProfile?.photo_url || '';
+  pendingPhotoUrl = null;
+  document.getElementById('ep-name').value = name;
+  document.getElementById('ep-bday').value = bday;
+  document.getElementById('ep-avatar-initial').textContent = name.charAt(0).toUpperCase() || '?';
+  document.getElementById('ep-upload-status').textContent = '';
+  document.getElementById('ep-photo-input').value = '';
+  const img = document.getElementById('ep-avatar-img');
+  const initial = document.getElementById('ep-avatar-initial');
+  if(photoUrl){
+    img.src = photoUrl;
+    img.style.display = 'block';
+    initial.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    initial.style.display = 'flex';
+  }
+  document.getElementById('modal-editprofile').classList.add('open');
+  document.getElementById('backdrop-editprofile').classList.add('open');
+}
+
+function closeEditProfile(){
+  document.getElementById('modal-editprofile').classList.remove('open');
+  document.getElementById('backdrop-editprofile').classList.remove('open');
+  pendingPhotoUrl = null;
+}
+
+function timeoutPromise(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+': tiempo agotado')), ms))
+  ]);
+}
+
+async function handleProfilePhoto(input){
+  if(!input.files || !input.files.length) return;
+  const file = input.files[0];
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `avatars/${currentUser.id}/avatar.${ext}`;
+  const statusEl = document.getElementById('ep-upload-status');
+  statusEl.textContent = 'Leyendo imagen...';
+
+  try {
+    // Show local preview immediately via FileReader (instant feedback)
+    await new Promise((resolve)=>{
+      const reader = new FileReader();
+      reader.onload = e=>{
+        const img = document.getElementById('ep-avatar-img');
+        const initial = document.getElementById('ep-avatar-initial');
+        img.src = e.target.result;
+        img.style.display = 'block';
+        initial.style.display = 'none';
+        resolve();
+      };
+      reader.onerror = ()=> resolve();
+      reader.readAsDataURL(file);
+    });
+
+    statusEl.textContent = 'Subiendo...';
+
+    // Remove previous file (ignore errors if it doesn't exist)
+    try { await timeoutPromise(sb.storage.from('photos').remove([path]), 8000, 'Eliminar anterior'); } catch(e) {}
+
+    const { error: upErr } = await timeoutPromise(
+      sb.storage.from('photos').upload(path, file, { cacheControl:'3600', upsert:true, contentType:file.type }),
+      15000, 'Subida'
+    );
+    if(upErr) throw upErr;
+
+    const { data } = sb.storage.from('photos').getPublicUrl(path);
+    pendingPhotoUrl = data.publicUrl;
+    statusEl.textContent = '✓ Foto lista — presiona Guardar';
+  } catch(e) {
+    console.error(e);
+    statusEl.textContent = 'Error: ' + (e.message || 'no se pudo subir');
+    showToast('Error al subir la foto');
+  }
+}
+
+// Bind file input via addEventListener (more reliable on Android WebView than inline onchange)
+document.getElementById('ep-photo-input').addEventListener('change', function(){
+  handleProfilePhoto(this);
+});
+
+async function saveEditProfile(){
+  if(!currentUser){ showToast('No hay sesión activa'); return; }
+  const name = document.getElementById('ep-name').value.trim();
+  if(!name){ document.getElementById('ep-name').focus(); showToast('Escribe tu nombre'); return; }
+  const bday = document.getElementById('ep-bday').value || null;
+  const theme = document.getElementById('app').dataset.theme;
+  const photo_url = pendingPhotoUrl || currentProfile?.photo_url || null;
+
+  showToast('Guardando...');
+
+  try {
+    const {error} = await timeoutPromise(
+      sb.from('profiles').upsert({ id: currentUser.id, name, birthday: bday, theme, photo_url }),
+      10000, 'Guardar perfil'
+    );
+    if(error) throw error;
+
+    currentProfile = { ...currentProfile, name, birthday: bday, photo_url };
+    updateAvatarUI(name, photo_url);
+    closeEditProfile();
+    showToast('Perfil actualizado ✓');
+  } catch(e){
+    console.error(e);
+    showToast('Error: ' + (e.message || 'no se pudo guardar'));
+  }
+}
+
+function updateAvatarUI(name, photoUrl){
+  const av = document.getElementById('user-avatar');
+  if(photoUrl){
+    av.innerHTML = `<img src="${photoUrl}?t=${Date.now()}" alt="${name}">`;
+  } else {
+    av.innerHTML = name.charAt(0).toUpperCase();
+  }
+  document.getElementById('pm-name').textContent = name;
+}
+
+// ── LIAR'S BAR ────────────────────────────────────
+const LB_CARDS   = ['A','A','A','A','A','A','K','K','K','K','K','K','Q','Q','Q','Q','Q','Q','🃏','🃏'];
+const LB_NAMES   = { A:'As', K:'Rey', Q:'Reina', '🃏':'Comodín' };
+const LB_TABLE   = ['A','K','Q'];
+
+let lb = null; // game state
+
+function lbShuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function lbBulletPos(){ return Math.floor(Math.random()*6); }
+
+function startLiarsBar(){
+  // Determine my player index based on who sent the invite
+  // The inviter is player 0, the accepter is player 1
+  const amInviter = currentInviteId === null; // inviter has no currentInviteId
+  lb = { myIdx: amInviter ? 0 : 1, sessionId: null, selected: [] };
+
+  document.getElementById('liarsbar-lobby').style.display = 'none';
+  document.getElementById('liarsbar-game').style.display  = 'block';
+
+  if(amInviter){
+    // Create game session with initial state
+    lbCreateSession();
+  } else {
+    // Wait for session to be created by inviter
+    lbWatchSession();
+  }
+}
+
+async function lbCreateSession(){
+  const deck = lbShuffle([...LB_CARDS]);
+  const p0name = currentProfile?.name || 'Jugador 1';
+  const state = {
+    players: [
+      { name: p0name, hand: deck.slice(0,5), bullet: lbBulletPos(), shots: 0, alive: true },
+      { name: '...', hand: deck.slice(5,10), bullet: lbBulletPos(), shots: 0, alive: true },
+    ],
+    tableCard: LB_TABLE[Math.floor(Math.random()*3)],
+    turn: 0,
+    phase: 'waiting', // wait for player 2 name
+    lastPlay: null,
+    roundNum: 1,
+  };
+
+  const invId = pendingInviteId;
+  const { data, error } = await sb.from('game_sessions').insert({
+    invite_id: invId,
+    game_id: 'liarsbar',
+    state
+  }).select().single();
+
+  if(error){ showToast('Error creando sesión'); return; }
+  lb.sessionId = data.id;
+  lb.state = state;
+  lbWatchSession();
+  lbRender();
+}
+
+function lbWatchSession(){
+  sb.channel('lb-session')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'game_sessions'
+    }, async e => {
+      // Find session for our invite
+      const { data } = await sb.from('game_sessions')
+        .select('*')
+        .or(`invite_id.eq.${pendingInviteId || '00000000-0000-0000-0000-000000000000'},invite_id.eq.${currentInviteId || '00000000-0000-0000-0000-000000000000'}`)
+        .single();
+      if(!data) return;
+      lb.sessionId = data.id;
+      lb.state = data.state;
+      // If I'm player 2 and session just created, update my name
+      if(lb.myIdx === 1 && lb.state.players[1].name === '...'){
+        const newState = { ...lb.state };
+        newState.players[1].name = currentProfile?.name || 'Jugador 2';
+        newState.phase = 'play';
+        await lbPushState(newState);
+      } else {
+        lb.state = data.state;
+        lbRender();
+      }
+    })
+    .subscribe();
+
+  // Also load current state if session exists
+  if(lb.myIdx === 1){
+    setTimeout(async ()=>{
+      const { data } = await sb.from('game_sessions')
+        .select('*')
+        .eq('invite_id', currentInviteId)
+        .single();
+      if(data){
+        lb.sessionId = data.id;
+        lb.state = data.state;
+        if(lb.state.players[1].name === '...'){
+          const newState = { ...lb.state };
+          newState.players[1].name = currentProfile?.name || 'Jugador 2';
+          newState.phase = 'play';
+          await lbPushState(newState);
+        } else {
+          lbRender();
+        }
+      }
+    }, 1000);
+  }
+}
+
+async function lbPushState(newState){
+  if(!lb.sessionId) return;
+  lb.state = newState;
+  await sb.from('game_sessions').update({ state: newState, updated_at: new Date().toISOString() }).eq('id', lb.sessionId);
+  lbRender();
+}
+
+function resetLiarsBar(){
+  lb = null;
+  sb.channel('lb-session').unsubscribe();
+  document.getElementById('liarsbar-lobby').style.display = 'block';
+  document.getElementById('liarsbar-game').style.display  = 'none';
+  document.getElementById('lb-roulette-result').style.display = 'none';
+}
+
+function lbRender(){
+  if(!lb || !lb.state) return;
+  const s = lb.state;
+  const [p0,p1] = s.players;
+  const myIdx = lb.myIdx;
+
+  // Table card
+  document.getElementById('lb-table-card').textContent = LB_NAMES[s.tableCard] || s.tableCard;
+
+  // Player panels
+  lbRenderRevolver('lb-p1-revolver', p0);
+  lbRenderRevolver('lb-p2-revolver', p1);
+  document.getElementById('lb-p1-name').textContent = p0.name;
+  document.getElementById('lb-p2-name').textContent = p1.name;
+  document.getElementById('lb-p1-cards-count').textContent = p0.alive ? `${p0.hand.length} cartas` : '💀 Eliminado';
+  document.getElementById('lb-p2-cards-count').textContent = p1.alive ? `${p1.hand.length} cartas` : '💀 Eliminado';
+
+  document.getElementById('lb-p1-card').style.borderColor = s.turn===0 && s.phase==='play' ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('lb-p2-card').style.borderColor = s.turn===1 && s.phase==='play' ? 'var(--accent)' : 'var(--border)';
+
+  const lastEl = document.getElementById('lb-last-play');
+  if(s.lastPlay){
+    lastEl.style.display = 'block';
+    lastEl.textContent = `${s.lastPlay.playerName} jugó ${s.lastPlay.count} ${LB_NAMES[s.tableCard]}${s.lastPlay.count>1?'s':''}`;
+  } else {
+    lastEl.style.display = 'none';
+  }
+
+  const cur = s.players[s.turn];
+  const hand = document.getElementById('lb-hand');
+  const instr = document.getElementById('lb-turn-instruction');
+  const actions = document.getElementById('lb-actions');
+  lb.selected = [];
+
+  if(s.phase === 'waiting'){
+    document.getElementById('lb-turn-label').textContent = 'Esperando al otro jugador...';
+    instr.textContent = '';
+    hand.style.display = 'none';
+    actions.innerHTML = '';
+    return;
+  }
+
+  document.getElementById('lb-turn-label').textContent = `Turno de ${cur.name}`;
+  const isMyTurn = s.turn === myIdx;
+
+  if(s.phase === 'play'){
+    if(isMyTurn){
+      instr.textContent = `Elige 1-3 cartas y declara que son ${LB_NAMES[s.tableCard]}`;
+      hand.style.display = 'block';
+      lbRenderHand();
+      actions.innerHTML = `<button class="nd-save" onclick="lbPlayCards()" style="width:100%">Jugar cartas</button>`;
+    } else {
+      instr.textContent = `Esperando que ${cur.name} juegue...`;
+      hand.style.display = 'none';
+      actions.innerHTML = '';
+    }
+  }
+
+  if(s.phase === 'challenge'){
+    const prev = s.players[1 - s.turn];
+    if(isMyTurn){
+      instr.textContent = `${prev.name} jugó ${s.lastPlay.count} ${LB_NAMES[s.tableCard]}${s.lastPlay.count>1?'s':''}. ¿Qué haces?`;
+      hand.style.display = 'none';
+      actions.innerHTML = `
+        <button class="nd-save" onclick="lbBelieve()" style="width:100%">Creer 👍</button>
+        <button class="nd-cancel" style="width:100%;border-color:var(--accent);color:var(--accent)" onclick="lbChallenge()">¡Mentiroso! 🫵</button>`;
+    } else {
+      instr.textContent = `${cur.name} está decidiendo...`;
+      hand.style.display = 'none';
+      actions.innerHTML = '';
+    }
+  }
+
+  if(s.phase === 'over'){
+    const winner = s.players.find(p=>p.alive);
+    instr.textContent = winner ? `🎉 ${winner.name} gana la partida` : '';
+    hand.style.display = 'none';
+    actions.innerHTML = `<button class="nd-save" onclick="resetLiarsBar()" style="width:100%">Jugar de nuevo</button>`;
+  }
+}
+
+function lbRenderRevolver(elId, player){
+  const el = document.getElementById(elId);
+  let html = '';
+  for(let i=0;i<6;i++){
+    if(!player.alive && i < player.shots){
+      html += `<div style="width:16px;height:16px;border-radius:50%;background:#8B0010;border:2px solid #8B0010"></div>`;
+    } else if(i < player.shots){
+      html += `<div style="width:16px;height:16px;border-radius:50%;background:var(--text-muted);border:2px solid var(--border2)"></div>`;
+    } else {
+      html += `<div style="width:16px;height:16px;border-radius:50%;background:transparent;border:2px solid var(--border2)"></div>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+function lbRenderHand(){
+  const s = lb.state;
+  const cur = s.players[lb.myIdx];
+  const el = document.getElementById('lb-hand-cards');
+  el.innerHTML = cur.hand.map((c,i)=>{
+    const sel = lb.selected.includes(i);
+    const isValid = c === s.tableCard || c === '🃏';
+    return `<div onclick="lbToggleCard(${i})" style="
+      width:48px;height:68px;border-radius:10px;
+      border:2px solid ${sel?'var(--accent)':'var(--border2)'};
+      background:${sel?'var(--accent-bg)':'var(--surface2)'};
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.1rem;font-weight:800;cursor:pointer;
+      color:${isValid?'var(--text)':'var(--text-muted)'};"
+    >${LB_NAMES[c]||c}</div>`;
+  }).join('');
+  lbUpdateSelInfo();
+}
+
+function lbToggleCard(i){
+  const idx = lb.selected.indexOf(i);
+  if(idx > -1){ lb.selected.splice(idx,1); }
+  else {
+    if(lb.selected.length >= 3){ showToast('Máximo 3 cartas'); return; }
+    lb.selected.push(i);
+  }
+  lbRenderHand();
+}
+
+function lbUpdateSelInfo(){
+  const el = document.getElementById('lb-selected-info');
+  const n = lb.selected.length;
+  const s = lb.state;
+  el.textContent = n===0 ? 'Ninguna seleccionada' : `${n} carta${n>1?'s':''} — declararás ${n} ${LB_NAMES[s.tableCard]}${n>1?'s':''}`;
+}
+
+async function lbPlayCards(){
+  if(lb.selected.length === 0){ showToast('Selecciona al menos 1 carta'); return; }
+  const s = { ...lb.state };
+  const cur = s.players[lb.myIdx];
+  const cards = lb.selected.map(i => cur.hand[i]);
+  lb.selected.sort((a,b)=>b-a).forEach(i => cur.hand.splice(i,1));
+
+  if(cur.hand.length === 0){
+    cur.hand = lbShuffle([...LB_CARDS]).slice(0,5);
+    showToast('Sin cartas — se reparten nuevas');
+  }
+
+  s.lastPlay = { playerName: cur.name, count: cards.length, cards, declared: s.tableCard };
+  s.phase = 'challenge';
+  s.turn = 1 - lb.myIdx;
+  await lbPushState(s);
+}
+
+async function lbBelieve(){
+  const s = { ...lb.state };
+  s.phase = 'play';
+  s.turn = lb.myIdx; // challenger goes next
+  if(Math.random() < 0.3){
+    s.tableCard = LB_TABLE[Math.floor(Math.random()*3)];
+    showToast(`¡Nueva carta de mesa: ${LB_NAMES[s.tableCard]}!`);
+  }
+  await lbPushState(s);
+}
+
+async function lbChallenge(){
+  const s = { ...lb.state };
+  const play = s.lastPlay;
+  const liar = play.cards.some(c => c !== s.tableCard && c !== '🃏');
+  const shooterIdx = liar ? (1 - lb.myIdx) : lb.myIdx;
+  const shooter = s.players[shooterIdx];
+  const revealer = s.players[1 - shooterIdx];
+  const realCards = play.cards.map(c=>LB_NAMES[c]||c).join(', ');
+  const verdict = liar
+    ? `¡${revealer.name} tenía razón! ${shooter.name} mintió — tenía: ${realCards}`
+    : `¡${shooter.name} decía la verdad! Tenía: ${realCards}. ${revealer.name} dispara`;
+
+  shooter.shots++;
+  const hit = shooter.shots > shooter.bullet;
+  const resultEl = document.getElementById('lb-roulette-result');
+  resultEl.style.display = 'block';
+
+  if(hit){
+    shooter.alive = false;
+    s.phase = 'over';
+    resultEl.style.background = '#8B001022';
+    resultEl.style.border = '2px solid #8B0010';
+    resultEl.innerHTML = `
+      <div style="font-size:2.5rem">💥</div>
+      <div style="font-weight:800;font-size:16px;color:#8B0010;margin:6px 0">${verdict}</div>
+      <div style="font-size:13px;font-weight:700;color:#8B0010">${shooter.name} dispara... ¡BANG! 💀</div>`;
+  } else {
+    s.tableCard = LB_TABLE[Math.floor(Math.random()*3)];
+    s.turn = shooterIdx;
+    s.lastPlay = null;
+    s.phase = 'play';
+    s.roundNum++;
+    resultEl.style.background = 'var(--green-bg)';
+    resultEl.style.border = '2px solid var(--green)';
+    resultEl.innerHTML = `
+      <div style="font-size:2.5rem">😮‍💨</div>
+      <div style="font-weight:800;font-size:16px;color:var(--green);margin:6px 0">${verdict}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--green)">${shooter.name} dispara... ¡Clic! Salvado.</div>`;
+    setTimeout(()=>{ resultEl.style.display='none'; }, 2800);
+  }
+
+  await lbPushState(s);
+}
+
+function setGamesTab(tab, btn){
+  document.getElementById('games-solo').style.display     = tab==='solo'     ? 'block' : 'none';
+  document.getElementById('games-juntitos').style.display = tab==='juntitos' ? 'block' : 'none';
+  document.querySelectorAll('#page-juegos .nd-type-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  // Reset to menu view when switching tabs
+  if(tab==='juntitos'){
+    const menu = document.getElementById('games-juntitos-menu');
+    const screen = document.getElementById('liarsbar-screen');
+    if(menu) menu.style.display='block';
+    if(screen) screen.style.display='none';
+  }
+}
+
+function openLiarsBar(){
+  document.getElementById('games-juntitos-menu').style.display = 'none';
+  document.getElementById('liarsbar-screen').style.display     = 'block';
+}
+
+function closeLiarsBar(){
+  lb = null;
+  document.getElementById('liarsbar-lobby').style.display = 'block';
+  document.getElementById('liarsbar-game').style.display  = 'none';
+  document.getElementById('lb-roulette-result').style.display = 'none';
+  document.getElementById('liarsbar-screen').style.display     = 'none';
+  document.getElementById('games-juntitos-menu').style.display = 'block';
+}
+
+// ── GAME INVITES ──────────────────────────────────
+let currentInviteId = null;
+let pendingInviteId = null;
+
+async function inviteToGame(gameId, gameName){
+  if(!currentUser){ showToast('No hay sesión activa'); return; }
+  try {
+    // Get the other user
+    const { data: others } = await sb.from('profiles').select('id,name').neq('id', currentUser.id);
+    if(!others || others.length === 0){ showToast('No hay otro usuario registrado aún'); return; }
+    const target = others[0];
+
+    // Create invite in DB
+    const { data: invite, error } = await sb.from('game_invites').insert({
+      from_user: currentUser.id,
+      to_user: target.id,
+      game_id: gameId,
+      game_name: gameName,
+      status: 'pending'
+    }).select().single();
+    if(error) throw error;
+    pendingInviteId = invite.id;
+
+    // Show waiting screen
+    document.getElementById('waiting-msg').textContent = `¿Juguemos ${gameName}? enviado a ${target.name}`;
+    document.getElementById('modal-waiting').classList.add('open');
+    document.getElementById('backdrop-waiting').classList.add('open');
+
+    // Send OneSignal push notification
+    const { data: tokenData } = await sb.from('push_tokens').select('token').eq('user_id', target.id).single();
+    if(tokenData?.token){
+      const session = await sb.auth.getSession();
+      const res = await fetch(`${SUPA_URL}/functions/v1/send-invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.data.session.access_token}`
+        },
+        body: JSON.stringify({
+          token: tokenData.token,
+          gameId, gameName,
+          senderName: currentProfile?.name || 'Alguien',
+          inviteId: invite.id
+        })
+      });
+      if(!res.ok){
+        const errBody = await res.text();
+        console.error('send-invite failed:', res.status, errBody);
+        showToast('Notificación no enviada');
+      }
+    } else {
+      showToast('La otra persona aún no tiene notificaciones activadas');
+    }
+  } catch(e){
+    console.error(e);
+    showToast('Error al enviar invitación');
+  }
+}
+
+async function cancelInvite(){
+  if(pendingInviteId){
+    await sb.from('game_invites').update({status:'rejected'}).eq('id', pendingInviteId);
+    pendingInviteId = null;
+  }
+  document.getElementById('modal-waiting').classList.remove('open');
+  document.getElementById('backdrop-waiting').classList.remove('open');
+}
+
+function handleIncomingInvite(invite){
+  currentInviteId = invite.id;
+  const msg = `${invite.game_name} — ¿aceptas jugar?`;
+  document.getElementById('invite-msg').textContent = msg;
+  document.getElementById('modal-invite').classList.add('open');
+  document.getElementById('backdrop-invite').classList.add('open');
+}
+
+async function acceptInvite(){
+  if(!currentInviteId) return;
+  await sb.from('game_invites').update({status:'accepted'}).eq('id', currentInviteId);
+  document.getElementById('modal-invite').classList.remove('open');
+  document.getElementById('backdrop-invite').classList.remove('open');
+  // Go to the game
+  goPage(3);
+  setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
+  openLiarsBar();
+  startLiarsBar();
+  currentInviteId = null;
+}
+
+async function rejectInvite(){
+  if(currentInviteId){
+    await sb.from('game_invites').update({status:'rejected'}).eq('id', currentInviteId);
+    currentInviteId = null;
+  }
+  document.getElementById('modal-invite').classList.remove('open');
+  document.getElementById('backdrop-invite').classList.remove('open');
+}
+
+function handleInviteResponse(invite){
+  // Called on the inviter's side when status changes
+  document.getElementById('modal-waiting').classList.remove('open');
+  document.getElementById('backdrop-waiting').classList.remove('open');
+  pendingInviteId = null;
+
+  if(invite.status === 'accepted'){
+    showToast('¡Invitación aceptada! Entrando al juego...');
+    goPage(3);
+    setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
+    openLiarsBar();
+    startLiarsBar();
+  } else {
+    showToast('Invitación rechazada 😕');
+  }
+}
+
+// ── VIAJES NAV ────────────────────────────────────
+function showViajesSection(name, btn){
+  ['tablero','ideas','mapa'].forEach(s=>{
+    const el = document.getElementById('section-'+s);
+    if(el) el.style.display = s===name ? 'block' : 'none';
+  });
+  document.querySelectorAll('#page-viajes .nav-tab').forEach(t=>t.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else {
+    const b = document.getElementById('vtab-'+name);
+    if(b) b.classList.add('active');
+  }
+  if(name === 'mapa'){
+    setTimeout(initMap, 50);
+  }
+}
+
+// ── MAPA (Leaflet + OpenStreetMap) ────────────────
+let leafletMap = null;
+let mapMarkers = [];
+let userLocationMarker = null;
+
+const TEMUCO = { lat: -38.7359, lng: -72.5904 };
+
+async function initMap(){
+  const firstLoad = !leafletMap;
+  if(!leafletMap){
+    leafletMap = L.map('leaflet-map', { zoomControl: true, attributionControl: true })
+      .setView([TEMUCO.lat, TEMUCO.lng], 8);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(leafletMap);
+  } else {
+    leafletMap.invalidateSize();
+  }
+  renderMapPins();
+
+  if(firstLoad){
+    await centerOnMe(true);
+  }
+}
+
+function placeEmojiIcon(emoji, status){
+  const bg = status==='done' ? '#9B85CC' : status==='planned' ? '#1A5C35' : '#B02050';
+  return L.divIcon({
+    html: `<div style="background:${bg};width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${emoji||'📍'}</div>`,
+    className: '',
+    iconSize: [34,34],
+    iconAnchor: [17,17]
+  });
+}
+
+function renderMapPins(){
+  if(!leafletMap) return;
+  // Clear old markers
+  mapMarkers.forEach(m=>leafletMap.removeLayer(m));
+  mapMarkers = [];
+
+  const withCoords = places.filter(p=>p.lat!=null && p.lng!=null);
+  withCoords.forEach(p=>{
+    const marker = L.marker([p.lat, p.lng], { icon: placeEmojiIcon(p.emoji, p.status) })
+      .addTo(leafletMap)
+      .bindPopup(`<b>${p.name}</b><br><span style="font-size:12px">${p.description||''}</span>`);
+    mapMarkers.push(marker);
+  });
+
+  if(withCoords.length === 0){
+    leafletMap.setView([TEMUCO.lat, TEMUCO.lng], 8);
+  }
+}
+
+function fitAllPins(){
+  if(!leafletMap) return;
+  const withCoords = places.filter(p=>p.lat!=null && p.lng!=null);
+  if(withCoords.length === 0){
+    showToast('Aún no hay destinos con ubicación');
+    leafletMap.setView([TEMUCO.lat, TEMUCO.lng], 8);
+    return;
+  }
+  const bounds = L.latLngBounds(withCoords.map(p=>[p.lat,p.lng]));
+  leafletMap.fitBounds(bounds, { padding:[40,40], maxZoom:13 });
+}
+
+async function centerOnMe(silent){
+  if(!silent) showToast('Buscando tu ubicación...');
+
+  // Try Capacitor native plugin first
+  try {
+    const Geo = window.Capacitor?.Plugins?.Geolocation;
+    if(Geo){
+      const pos = await Geo.getCurrentPosition({ enableHighAccuracy:true, timeout:10000 });
+      placeUserMarker(pos.coords.latitude, pos.coords.longitude);
+      return;
+    }
+  } catch(e){
+    console.error('Capacitor geolocation error', e);
+    if(!silent) showToast('No se pudo obtener tu ubicación — revisa permisos');
+    if(silent) return; // don't fall through with a second error on silent init
+  }
+
+  // Fallback: browser geolocation
+  if(!navigator.geolocation){
+    if(!silent) showToast('Geolocalización no disponible en este dispositivo');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ placeUserMarker(pos.coords.latitude, pos.coords.longitude); },
+    err=>{
+      console.error(err);
+      if(!silent) showToast('No se pudo obtener tu ubicación — revisa permisos');
+    },
+    { enableHighAccuracy:true, timeout:10000 }
+  );
+}
+
+function placeUserMarker(latitude, longitude){
+  if(userLocationMarker) leafletMap.removeLayer(userLocationMarker);
+  userLocationMarker = L.circleMarker([latitude, longitude], {
+    radius:9, color:'#fff', weight:3, fillColor:'#4285F4', fillOpacity:1
+  }).addTo(leafletMap).bindPopup('Estás aquí');
+  leafletMap.setView([latitude, longitude], 13);
+  fetchNearbyRecs(latitude, longitude);
+}
+
+// Geocode a place name to lat/lng using Nominatim (OpenStreetMap)
+async function geocodePlace(name){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(name)}`;
+    const res = await fetch(url, { headers: { 'Accept-Language':'es' } });
+    const data = await res.json();
+    if(data && data.length > 0){
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+  } catch(e){ console.error('Geocode error', e); }
+  return null;
+}
+
+function setFilter(f){
+  filter = f;
+  ['planned','dream','done'].forEach(k=>{
+    document.getElementById('filt-'+k).classList.toggle('active',k===f);
+  });
+  document.getElementById('list-title').textContent = ftitles[f];
+  renderPlaces();
+}
+
+// ── MUSIC BUTTON ──────────────────────────────────
+let musicDragging = false;
+let musicLongPressTimer = null;
+let musicDragStartY = 0;
+let musicStartBottom = 0;
+let spotifyConnected = false;
+
+function initMusicDrag(){
+  const el = document.getElementById('mk-music');
+  if(!el) return;
+
+  // Restore saved position
+  const saved = localStorage.getItem('mk_music_bottom');
+  if(saved) el.style.bottom = saved;
+
+  el.addEventListener('touchstart', e=>{
+    if(e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    musicDragStartY = touch.clientY;
+    musicStartBottom = parseInt(el.style.bottom) || 32;
+    musicLongPressTimer = setTimeout(()=>{
+      musicDragging = true;
+      el.classList.add('dragging');
+      clearTimeout(mTimer);
+      if(navigator.vibrate) navigator.vibrate(60);
+    }, 600);
+  }, {passive:true});
+
+  el.addEventListener('touchmove', e=>{
+    if(!musicDragging) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dy = musicDragStartY - touch.clientY;
+    const newBottom = Math.max(70, Math.min(window.innerHeight - 120, musicStartBottom + dy));
+    el.style.bottom = newBottom + 'px';
+  }, {passive:false});
+
+  el.addEventListener('touchend', ()=>{
+    clearTimeout(musicLongPressTimer);
+    if(musicDragging){
+      musicDragging = false;
+      el.classList.remove('dragging');
+      localStorage.setItem('mk_music_bottom', el.style.bottom);
+    }
+  }, {passive:true});
+}
+
+function toggleMusic(){
+  if(musicDragging) return;
+  const w = document.getElementById('mk-music');
+  const open = !w.classList.contains('open');
+  clearTimeout(mTimer);
+  if(open){
+    w.classList.add('open');
+    mTimer = setTimeout(()=> w.classList.remove('open'), 5000);
+  } else {
+    w.classList.remove('open');
+  }
+}
+
+function handleMusicClick(){
+  if(musicDragging) return;
+  const w = document.getElementById('mk-music');
+  const isOpen = w.classList.contains('open');
+  if(isOpen){
+    openSpotifyModal();
+    clearTimeout(mTimer);
+    mTimer = setTimeout(()=> w.classList.remove('open'), 5000);
+  } else {
+    toggleMusic();
+  }
+}
+
+function openSpotifyModal(){
+  document.getElementById('modal-spotify').classList.add('open');
+  document.getElementById('backdrop-spotify').classList.add('open');
+}
+function closeSpotifyModal(){
+  document.getElementById('modal-spotify').classList.remove('open');
+  document.getElementById('backdrop-spotify').classList.remove('open');
+}
+
+// ── ESTUDIAR — DUAL MODE ──────────────────────────
+let studyMode = 'normal'; // 'normal' | 'study'
+let workTimeMins = 25;
+let breakTimeMins = 5;
+let studyPhase = 'work'; // 'work' | 'break'
+
+function setStudyMode(mode){
+  studyMode = mode;
+  resetChrono();
+  document.getElementById('mode-normal').classList.toggle('active', mode==='normal');
+  document.getElementById('mode-study').classList.toggle('active', mode==='study');
+  document.getElementById('study-config').style.display = mode==='study' ? 'block' : 'none';
+  const label = document.getElementById('timer-phase-label');
+  if(label) label.textContent = mode==='normal' ? 'Temporizador' : 'Tiempo de estudio';
+  if(mode === 'study') requestNotificationPermission();
+}
+
+function adjustTime(type, delta){
+  if(type==='work'){
+    workTimeMins = Math.max(5, workTimeMins + delta);
+    document.getElementById('work-time-display').textContent = workTimeMins;
+  } else {
+    breakTimeMins = Math.max(1, breakTimeMins + delta);
+    document.getElementById('break-time-display').textContent = breakTimeMins;
+  }
+  if(!chronoRunning) resetChrono();
+}
+
+// ── ESTUDIO: SONIDO Y VIBRACIÓN ───────────────────
+let vibrationEnabled = safeParse('mk_vibration', true);
+
+function toggleVibration(){
+  vibrationEnabled = !vibrationEnabled;
+  localStorage.setItem('mk_vibration', JSON.stringify(vibrationEnabled));
+  const btn   = document.getElementById('vibration-toggle');
+  const knob  = document.getElementById('vibration-knob');
+  if(btn)  btn.style.background  = vibrationEnabled ? 'var(--accent)' : 'var(--border2)';
+  if(knob) knob.style.right      = vibrationEnabled ? '3px' : 'calc(100% - 23px)';
+}
+
+function initVibrationToggle(){
+  const btn  = document.getElementById('vibration-toggle');
+  const knob = document.getElementById('vibration-knob');
+  if(!btn || !knob) return;
+  btn.style.background = vibrationEnabled ? 'var(--accent)' : 'var(--border2)';
+  knob.style.right     = vibrationEnabled ? '3px' : 'calc(100% - 23px)';
+}
+
+function playAlertSound(){
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Play 3 short beeps
+    [0, 0.3, 0.6].forEach(delay => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type      = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.5, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.25);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime  + delay + 0.25);
+    });
+  } catch(e){ console.error('Audio error', e); }
+}
+
+function fireTimerAlert(){
+  try {
+    playAlertSound();
+  } catch(e){ console.error('Sound error', e); }
+
+  fireVibration();
+}
+
+async function fireVibration(){
+  if(!vibrationEnabled) return;
+  try {
+    const Haptics = window.Capacitor?.Plugins?.Haptics;
+    if(Haptics){
+      // Fire a few strong impacts in sequence for a noticeable pattern
+      await Haptics.notification({ type: 'SUCCESS' });
+      setTimeout(()=>Haptics.impact({ style: 'HEAVY' }).catch(()=>{}), 300);
+      setTimeout(()=>Haptics.impact({ style: 'HEAVY' }).catch(()=>{}), 600);
+      return;
+    }
+  } catch(e){ console.error('Haptics error', e); }
+
+  // Fallback to Web Vibration API if Haptics isn't available
+  try {
+    if(navigator.vibrate){
+      navigator.vibrate([300, 100, 300, 100, 300]);
+    }
+  } catch(e){ console.error('Vibration error', e); }
+}
+
+function updateChronoDisplay(){
+  let secs;
+  if(studyMode==='study'){
+    const totalSecs = studyPhase==='work' ? workTimeMins*60 : breakTimeMins*60;
+    secs = totalSecs - chronoSecs;
+    if(secs <= 0){
+      clearInterval(chronoInterval);
+      chronoRunning = false;
+      fireTimerAlert();
+      if(studyPhase==='work'){
+        studyPhase = 'break';
+        chronoSecs = 0;
+        showToast('¡Tiempo de descanso! 😌');
+        document.getElementById('timer-phase-label').textContent = 'Descanso';
+        document.getElementById('chrono-sub').textContent = 'Pausado';
+        document.getElementById('chrono-btn').textContent = 'Iniciar descanso';
+      } else {
+        studyPhase = 'work';
+        chronoSecs = 0;
+        incrementCounter();
+        showToast('¡Sesión completada! 🎯');
+        document.getElementById('timer-phase-label').textContent = 'Tiempo de estudio';
+        document.getElementById('chrono-sub').textContent = 'Pausado';
+        document.getElementById('chrono-btn').textContent = 'Iniciar';
+      }
+      const totalSecs2 = studyPhase==='work' ? workTimeMins*60 : breakTimeMins*60;
+      secs = totalSecs2;
+    }
+  } else {
+    secs = chronoSecs;
+  }
+  const m = String(Math.floor(Math.abs(secs)/60)).padStart(2,'0');
+  const s = String(Math.abs(secs)%60).padStart(2,'0');
+  const el = document.getElementById('chrono-display');
+  if(el) el.textContent = m+':'+s;
+}
+
+// ── LOCAL NOTIFICATIONS (timer background) ────────
+let chronoStartTimestamp = null;
+let chronoStartSecs = 0;
+
+async function requestNotificationPermission(){
+  try {
+    const LN = window.Capacitor?.Plugins?.LocalNotifications;
+    if(!LN) return false;
+    const { display } = await LN.requestPermissions();
+    if(display !== 'granted') return false;
+
+    // Create the notification channel explicitly — required on Android 8+.
+    // Without this, notifications with an unrecognized channelId are
+    // silently dropped with no error, which is exactly what was happening.
+    await LN.createChannel({
+      id: 'study_timer',
+      name: 'Temporizador de estudio',
+      description: 'Muestra el progreso del temporizador de estudio',
+      importance: 4, // HIGH — shows as heads-up + persistent
+      visibility: 1,
+      sound: 'beep.wav',
+      vibration: true,
+      vibrationPattern: [0, 300, 100, 300, 100, 300],
+    }).catch(e => console.error('createChannel error', e));
+
+    // When the "timer ended" notification arrives while the app is open,
+    // Android suppresses the channel's vibration since the app is foregrounded.
+    // Fire haptics manually in that case so it's never silent.
+    LN.addListener('localNotificationReceived', (notification)=>{
+      if(notification?.extra?.isTimerEnd){
+        fireVibration();
+      }
+    });
+
+    return true;
+  } catch(e){ console.error('Permission error', e); return false; }
+}
+
+let notifUpdateInterval = null;
+
+async function scheduleTimerNotification(secsRemaining, label){
+  try {
+    const LN = window.Capacitor?.Plugins?.LocalNotifications;
+    if(!LN || secsRemaining <= 0) return;
+
+    await LN.cancel({ notifications: [{ id: 1 }, { id: 2 }] }).catch(()=>{});
+
+    // Ongoing notification showing live progress while the timer runs
+    await showOngoingTimerNotification(secsRemaining, label);
+
+    // Final notification that fires exactly when the timer reaches 0
+    const fireAt = new Date(Date.now() + secsRemaining * 1000);
+    await LN.schedule({
+      notifications: [{
+        id: 2,
+        title: '⏱ Monkitrip',
+        body: `¡${label}!`,
+        schedule: { at: fireAt },
+        smallIcon: 'ic_stat_icon_config_sample',
+        channelId: 'study_timer',
+        extra: { isTimerEnd: true }
+      }]
+    });
+
+    // Keep the ongoing notification's countdown updated every second
+    clearInterval(notifUpdateInterval);
+    notifUpdateInterval = setInterval(()=>{
+      if(!chronoRunning){ clearInterval(notifUpdateInterval); return; }
+      const totalSecs = studyPhase==='work' ? workTimeMins*60 : breakTimeMins*60;
+      const remaining = Math.max(0, totalSecs - chronoSecs);
+      if(remaining <= 0){ clearInterval(notifUpdateInterval); return; }
+      showOngoingTimerNotification(remaining, label);
+    }, 1000);
+
+  } catch(e){ console.error('Notification schedule error', e); }
+}
+
+async function showOngoingTimerNotification(secsRemaining, label){
+  try {
+    const LN = window.Capacitor?.Plugins?.LocalNotifications;
+    if(!LN) return;
+    const m = Math.floor(secsRemaining/60);
+    const s = secsRemaining%60;
+    await LN.schedule({
+      notifications: [{
+        id: 1,
+        title: '⏱ ' + label,
+        body: `${m}:${String(s).padStart(2,'0')} restantes`,
+        ongoing: true,
+        autoCancel: false,
+        smallIcon: 'ic_stat_icon_config_sample',
+        channelId: 'study_timer',
+      }]
+    });
+  } catch(e){ console.error('Ongoing notification error', e); }
+}
+
+async function cancelTimerNotification(){
+  try {
+    clearInterval(notifUpdateInterval);
+    const LN = window.Capacitor?.Plugins?.LocalNotifications;
+    if(LN) await LN.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
+  } catch(e){}
+}
+
+// ── KEEP SCREEN AWAKE WHILE TIMER RUNS (foreground only) ──
+async function keepAwakeOn(){
+  try {
+    const KA = window.Capacitor?.Plugins?.KeepAwake;
+    if(KA) await KA.keepAwake();
+  } catch(e){ console.error('KeepAwake on error', e); }
+}
+async function keepAwakeOff(){
+  try {
+    const KA = window.Capacitor?.Plugins?.KeepAwake;
+    if(KA) await KA.allowSleep();
+  } catch(e){ console.error('KeepAwake off error', e); }
+}
+
+function syncChronoFromBackground(){
+  if(!chronoRunning || !chronoStartTimestamp) return;
+  const elapsed = Math.floor((Date.now() - chronoStartTimestamp) / 1000);
+  chronoSecs = chronoStartSecs + elapsed;
+}
+
+function toggleChrono(){
+  chronoRunning = !chronoRunning;
+  const btn = document.getElementById('chrono-btn');
+  const sub = document.getElementById('chrono-sub');
+  if(chronoRunning){
+    chronoStartTimestamp = Date.now();
+    chronoStartSecs = chronoSecs;
+    chronoInterval = setInterval(()=>{ chronoSecs++; updateChronoDisplay(); }, 1000);
+    if(btn) btn.textContent = 'Pausar';
+    if(sub) sub.textContent = studyMode==='study' ? (studyPhase==='work'?'Estudiando':'Descansando') : 'Corriendo';
+    keepAwakeOn();
+    // Only send the notification during the break phase — during study the
+    // user stays inside the app the whole time, so no notification needed.
+    if(studyMode === 'study' && studyPhase === 'break'){
+      const totalSecs = breakTimeMins*60;
+      const remaining = totalSecs - chronoSecs;
+      scheduleTimerNotification(remaining, 'Descanso');
+    } else {
+      cancelTimerNotification();
+    }
+  } else {
+    clearInterval(chronoInterval);
+    chronoStartTimestamp = null;
+    cancelTimerNotification();
+    keepAwakeOff();
+    if(btn) btn.textContent = 'Continuar';
+    if(sub) sub.textContent = 'Pausado';
+  }
+}
+
+function resetChrono(){
+  clearInterval(chronoInterval);
+  chronoRunning = false;
+  chronoSecs = 0;
+  studyPhase = 'work';
+  updateChronoDisplay();
+  const btn = document.getElementById('chrono-btn');
+  const sub = document.getElementById('chrono-sub');
+  const label = document.getElementById('timer-phase-label');
+  if(btn) btn.textContent = 'Iniciar';
+  if(sub) sub.textContent = 'Pausado';
+  if(label) label.textContent = studyMode==='normal' ? 'Temporizador' : 'Tiempo de estudio';
+}
+
+function incrementCounter(){
+  sessionCount++;
+  localStorage.setItem('mk_sessions', sessionCount);
+  const el = document.getElementById('counter-display');
+  if(el) el.textContent = sessionCount;
+}
+
+// ─── PLACES ────────────────────────────────────────
+function sl(s){ return {dream:'Sueño',planned:'Planeado',done:'Visitado'}[s]||s; }
+
+function renderPlaces(){
+  const list = document.getElementById('places-list');
+  const done = places.filter(p=>p.status==='done').length;
+  document.getElementById('cnt-all').textContent    = places.length;
+  document.getElementById('cnt-planned').textContent = places.filter(p=>p.status==='planned').length;
+  document.getElementById('cnt-done').textContent   = done;
+  document.getElementById('fv-badge').textContent   = done;
+  const filtered = places.filter(p=>p.status===filter);
+  if(!filtered.length){
+    list.innerHTML=`<div class="empty"><p>${fempty[filter]}</p></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(p=>{
+    const isOpen = openId===p.id;
+    const isDone = p.status==='done';
+    const photos = p.place_photos||[];
+    let dd='';
+    if(isDone){
+      const ph = photos.map((ph,i)=>`<div class="photo-thumb"><img src="${ph.url}" alt=""><button class="rm-photo" onclick="removePhoto(${p.id},'${ph.id}','${ph.url}')">×</button></div>`).join('');
+      dd=`<div class="dd-title">Fotos</div>
+          <div class="photos-grid">${ph}<label class="upload-btn"><span style="font-size:1.4rem">+</span><span>Subir</span><input type="file" accept="image/*" onchange="uploadPhoto(${p.id},this)"></label></div>
+          <div class="dd-title" style="margin-top:8px">Notas</div>
+          <textarea class="note-area" id="note-${p.id}" placeholder="Escribe algo que recuerdes...">${p.notes||''}</textarea>
+          <button class="save-btn" onclick="saveNote(${p.id})">Guardar nota</button>
+          <div class="dd-title" style="margin-top:8px">Editar descripción</div>
+          <textarea class="desc-area" id="desc-${p.id}">${p.description||''}</textarea>
+          <button class="save-btn" onclick="saveDesc(${p.id})">Guardar</button>`;
+    } else {
+      const ph = photos.length?photos.map(ph=>`<div class="photo-thumb"><img src="${ph.url}" alt=""></div>`).join(''):'<div class="photo-thumb" style="font-size:1.5rem">📷</div>';
+      const pi = p.status==='dream'?'→':'←';
+      const pl = p.status==='dream'?'Mover a Planeado':'Mover a Sueño';
+      dd=`<div class="dd-title">Fotos</div>
+          <div class="photos-grid">${ph}</div>
+          <div class="dd-title" style="margin-top:8px">Notas</div>
+          <textarea class="note-area" id="note-${p.id}" placeholder="Escribe algo sobre este lugar...">${p.notes||''}</textarea>
+          <button class="save-btn" onclick="saveNote(${p.id})">Guardar nota</button>
+          <div class="dd-title" style="margin-top:8px">Videos</div>
+          <div class="vid-ph">Videos — Disponible con la próxima actualización</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+            <button class="dd-action postpone" onclick="postponePlace(${p.id},'${p.status}')">${pi} ${pl}</button>
+            <button class="dd-action danger" onclick="cancelPlace(${p.id})">Cancelar salida</button>
+          </div>`;
+    }
+    return `<div class="place-card${isOpen?' open':''}" id="card-${p.id}">
+      <div class="place-hd" onclick="toggleCard(${p.id})">
+        <div class="place-emoji">${p.emoji}</div>
+        <div class="place-info">
+          <div class="place-name">${p.name}</div>
+          <div class="place-desc-s">${p.description||''}</div>
+          <div class="place-meta"><span class="tag ${p.status}">${sl(p.status)}</span></div>
+        </div>
+        <span class="chev">▾</span>
+      </div>
+      <div class="place-dd"><div class="dd-inner">${dd}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(id){ openId=openId===id?null:id; renderPlaces(); }
+
+// ── NUEVO DESTINO ────────────────────────────────
+let ndType = 'planned';
+
+function openNuevo(){
+  ndType = filter === 'dream' ? 'dream' : 'planned';
+  document.getElementById('nd-name').value = '';
+  document.getElementById('nd-desc').value = '';
+  document.getElementById('nd-date').value = '';
+  ndSetType(ndType);
+  document.getElementById('modal-nd').classList.add('open');
+  document.getElementById('backdrop-nd').classList.add('open');
+}
+
+function closeNuevo(){
+  document.getElementById('modal-nd').classList.remove('open');
+  document.getElementById('backdrop-nd').classList.remove('open');
+}
+function ndSetType(type){
+  ndType = type;
+  document.getElementById('nd-btn-planned').classList.toggle('active', type==='planned');
+  document.getElementById('nd-btn-dream').classList.toggle('active',   type==='dream');
+  document.getElementById('nd-date-group').style.display = type==='planned' ? 'block' : 'none';
+}
+async function saveNuevo(){
+  if(!currentUser){ showToast('No hay sesión activa'); return; }
+  const name = document.getElementById('nd-name').value.trim();
+  if(!name){ document.getElementById('nd-name').focus(); return; }
+  const payload = {
+    name,
+    description: document.getElementById('nd-desc').value.trim(),
+    status: ndType,
+    emoji: '📍',
+    created_by: currentUser.id,
+  };
+  const date = document.getElementById('nd-date').value;
+  if(ndType === 'planned' && date) payload.planned_date = date;
+  const {data, error} = await sb.from('places').insert(payload).select().single();
+  if(error){ showToast('Error al guardar'); return; }
+  closeNuevo();
+  showToast(ndType==='planned' ? '¡Plan creado! ✓' : '¡Sueño agregado! ✓');
+
+  // Geocode in background, then update with lat/lng
+  if(data){
+    geocodePlace(name).then(coords=>{
+      if(coords){
+        sb.from('places').update({lat:coords.lat, lng:coords.lng}).eq('id', data.id);
+      }
+    });
+  }
+}
+
+async function postponePlace(id, currentStatus){
+  const newStatus = currentStatus==='dream'?'planned':'dream';
+  await sb.from('places').update({status:newStatus}).eq('id',id);
+  openId=null;
+}
+
+async function cancelPlace(id){
+  await sb.from('places').delete().eq('id',id);
+  openId=null;
+}
+
+async function saveNote(id){
+  const notes = document.getElementById('note-'+id)?.value;
+  await sb.from('places').update({notes}).eq('id',id);
+  showToast('Nota guardada ✓');
+}
+
+async function saveDesc(id){
+  const description = document.getElementById('desc-'+id)?.value;
+  await sb.from('places').update({description}).eq('id',id);
+  showToast('Descripción actualizada ✓');
+}
+
+async function uploadPhoto(placeId, input){
+  if(!input.files.length) return;
+  const file = input.files[0];
+  const ext  = file.name.split('.').pop();
+  const path = `${currentUser.id}/${placeId}/${Date.now()}.${ext}`;
+  showToast('Subiendo foto...');
+  const {error:upErr} = await sb.storage.from('photos').upload(path, file);
+  if(upErr){ showToast('Error al subir foto'); return; }
+  const {data:{publicUrl}} = sb.storage.from('photos').getPublicUrl(path);
+  await sb.from('place_photos').insert({place_id:placeId, url:publicUrl});
+  showToast('¡Foto subida! ✓');
+}
+
+async function removePhoto(placeId, photoId, url){
+  const path = url.split('/photos/')[1];
+  await sb.storage.from('photos').remove([path]);
+  await sb.from('place_photos').delete().eq('id', photoId);
+  showToast('Foto eliminada');
+}
+
+async function addRec(recId){
+  const r = RECS.find(r=>r.id===recId);
+  if(!r) return;
+  const payload = {name:r.name, description:r.desc, status:'dream', emoji:r.e, created_by:currentUser.id};
+  if(r.lat!=null && r.lng!=null){ payload.lat = r.lat; payload.lng = r.lng; }
+  await sb.from('places').insert(payload);
+  showToast(`${r.name} agregado a Sueños ✓`);
+}
+
+// ─── IDEAS ─────────────────────────────────────────
+function renderIdeas(){
+  const list = document.getElementById('proposals-list');
+  if(!ideas.length){ list.innerHTML='<div class="empty"><p>Sin propuestas todavía.</p></div>'; return; }
+  list.innerHTML = ideas.map(i=>{
+    const myVote = myVotes[i.id]||null;
+    const txt = myVote==='yes'?'¡Te apuntaste! 🎉':myVote==='no'?'Le dijiste que no.':myVote==='maybe'?'Estás dudando.':'¿Qué opinas?';
+    const who = i.profiles?.name||'Alguien';
+    return `<div class="prop-card">
+      <div class="prop-top"><div class="prop-title">${i.title}</div><button class="prop-del" onclick="delIdea(${i.id})">×</button></div>
+      ${i.description?`<div class="prop-desc">${i.description}</div>`:''}
+      <div class="votes-row">
+        <button class="vote-pill yes${myVote==='yes'?' selected':''}" onclick="vote(${i.id},'yes')">✓ Sí</button>
+        <button class="vote-pill maybe${myVote==='maybe'?' selected':''}" onclick="vote(${i.id},'maybe')">~ Quizás</button>
+        <button class="vote-pill no${myVote==='no'?' selected':''}" onclick="vote(${i.id},'no')">✕ No</button>
+      </div>
+      <div class="prop-footer"><div class="vote-result">${txt}</div><div class="prop-who">${who}</div></div>
+    </div>`;
+  }).join('');
+}
+
+async function saveIdea(){
+  const title = document.getElementById('idea-title').value.trim();
+  if(!title) return;
+  await sb.from('ideas').insert({title, description:document.getElementById('idea-desc').value.trim(), proposed_by:currentUser.id});
+  closeModal('idea');
+  showToast('¡Propuesta enviada! ✓');
+}
+
+async function vote(ideaId, v){
+  const current = myVotes[ideaId];
+  if(current===v){
+    await sb.from('idea_votes').delete().eq('idea_id',ideaId).eq('user_id',currentUser.id);
+    delete myVotes[ideaId];
+  } else {
+    await sb.from('idea_votes').upsert({idea_id:ideaId, user_id:currentUser.id, vote:v});
+    myVotes[ideaId] = v;
+  }
+  renderIdeas();
+}
+
+async function delIdea(id){
+  await sb.from('ideas').delete().eq('id',id);
+}
+
+// ── JUEGOS ────────────────────────────────────────
+function renderRecs(){
+  const list = document.getElementById('recs-list');
+  if(recsLoading){
+    list.innerHTML = '<div class="empty"><p>Buscando lugares cerca de ti...</p></div>';
+    return;
+  }
+  if(!RECS.length){
+    list.innerHTML = '<div class="empty"><p>Activa tu ubicación en el mapa para ver recomendaciones cercanas.</p></div>';
+    return;
+  }
+  list.innerHTML = RECS.map(r=>`
+    <div class="rec-card">
+      <div class="rec-em">${r.e}</div>
+      <div class="rec-info">
+        <div class="rec-name">${r.name}</div>
+        <div class="rec-desc">${r.desc}</div>
+        <div class="rec-foot">
+          <span class="rec-badge${r.offer?' offer':''}">${r.badge}</span>
+          <span class="rec-dist">${r.dist}</span>
+          <button class="rec-add" onclick="addRec('${r.id}')">+ Guardar</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// Categorías OSM que buscamos y su emoji/etiqueta
+const OVERPASS_TAGS = [
+  { key:'tourism', value:'attraction', emoji:'🎡', badge:'Atracción' },
+  { key:'tourism', value:'viewpoint',  emoji:'🌄', badge:'Mirador' },
+  { key:'tourism', value:'museum',     emoji:'🏛️', badge:'Museo' },
+  { key:'natural', value:'beach',      emoji:'🏖️', badge:'Playa' },
+  { key:'leisure', value:'park',       emoji:'🌳', badge:'Parque' },
+  { key:'amenity', value:'cafe',       emoji:'☕', badge:'Café' },
+  { key:'amenity', value:'restaurant', emoji:'🍽️', badge:'Restaurante' },
+  { key:'tourism', value:'hot_spring', emoji:'♨️', badge:'Termas' },
+];
+
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function formatDist(km){
+  if(km < 1) return Math.round(km*1000)+' m';
+  return km.toFixed(1)+' km';
+}
+
+async function fetchNearbyRecs(lat, lng){
+  // Avoid refetching for tiny movements
+  if(lastRecsCoords){
+    const moved = haversineKm(lat,lng,lastRecsCoords.lat,lastRecsCoords.lng);
+    if(moved < 1 && RECS.length) return;
+  }
+  lastRecsCoords = {lat,lng};
+  recsLoading = true;
+  renderRecs();
+
+  const radius = 8000; // 8km
+  const filters = OVERPASS_TAGS.map(t=>
+    `node["${t.key}"="${t.value}"](around:${radius},${lat},${lng});`
+  ).join('\n');
+
+  const query = `[out:json][timeout:15];(\n${filters}\n);out center 30;`;
+
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query)
+    });
+    const data = await res.json();
+    const elements = (data.elements || []).filter(el => el.tags && el.tags.name);
+
+    const seen = new Set();
+    const results = [];
+    for(const el of elements){
+      const name = el.tags.name;
+      if(seen.has(name)) continue;
+      seen.add(name);
+
+      const matchTag = OVERPASS_TAGS.find(t => el.tags[t.key] === t.value);
+      const dist = haversineKm(lat, lng, el.lat, el.lon);
+
+      results.push({
+        id: 'osm'+el.id,
+        e: matchTag?.emoji || '📍',
+        name,
+        desc: el.tags.description || `${matchTag?.badge || 'Lugar'} cerca de ti`,
+        badge: matchTag?.badge || 'Recomendado',
+        offer: false,
+        dist: formatDist(dist),
+        distKm: dist,
+        lat: el.lat,
+        lng: el.lon,
+      });
+    }
+
+    results.sort((a,b)=>a.distKm - b.distKm);
+    RECS = results.slice(0, 10);
+  } catch(e){
+    console.error('Overpass error', e);
+    RECS = [];
+  } finally {
+    recsLoading = false;
+    renderRecs();
+  }
+}
+
+// ─── MODALS ────────────────────────────────────────
+function openModal(t){
+  if(t==='idea'){
+    document.getElementById('idea-title').value='';
+    document.getElementById('idea-desc').value='';
+    document.getElementById('modal-idea').classList.add('open');
+    document.getElementById('backdrop-idea').classList.add('open');
+  }
+}
+function closeModal(t){
+  document.getElementById('modal-'+t).classList.remove('open');
+  const bd = document.getElementById('backdrop-'+t);
+  if(bd) bd.classList.remove('open');
+}
+
+// Service worker DESACTIVADO para el build nativo de Capacitor.
+// Capacitor ya empaqueta toda la app dentro del APK, así que no se necesita
+// caché offline vía SW — y mantenerlo activo puede interceptar/interferir
+// con peticiones fetch reales (como las de Supabase) causando timeouts
+// intermitentes después del primer arranque.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(reg=>reg.unregister());
+  }).catch(()=>{});
+}
+
+init();
+</script>
+</body>
+</html>

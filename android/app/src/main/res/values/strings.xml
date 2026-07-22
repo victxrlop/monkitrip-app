@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Monkitrip</string>
+    <string name="title_activity_main">Monkitrip</string>
+    <string name="package_name">com.victor.monkitrip</string>
+    <string name="custom_url_scheme">com.victor.monkitrip</string>
+</resources>

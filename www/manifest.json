@@ -1,0 +1,24 @@
+{
+  "name": "Monkitrip",
+  "short_name": "Monkitrip",
+  "description": "Planificador de viajes y salidas para dos",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF0F4",
+  "theme_color": "#B02050",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
