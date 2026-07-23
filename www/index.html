@@ -723,7 +723,7 @@
   <!-- HEADER -->
   <div id="header">
     <div class="header-top">
-      <div class="logo">monki<em>trip</em><span class="logo-v">v0.0.3</span></div>
+      <div class="logo">monki<em>trip</em><span class="logo-v">v0.0.4</span></div>
       <div class="header-right">
         <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()">Oscuro</button>
         <div class="avatar" id="user-avatar" onclick="toggleProfileMenu()">V</div>
@@ -908,8 +908,7 @@
                 <div class="game-card-name">Liar's Bar</div>
                 <div class="game-card-desc">Bluff y ruleta rusa. Di la verdad o muere.</div>
                 <div class="game-card-actions">
-                  <button class="game-btn-play" onclick="openLiarsBar()">Jugar</button>
-                  <button class="game-btn-invite" onclick="inviteToGame('liarsbar','Liar\'s Bar')">Invitar</button>
+                  <button class="game-btn-play" style="width:100%" onclick="openLiarsBar()">Jugar</button>
                 </div>
               </div>
             </div>
@@ -926,7 +925,23 @@
                 <div style="font-size:4rem">🃏</div>
                 <div class="prox-title" style="margin:0.5rem 0">Liar's Bar</div>
                 <div class="prox-sub" style="margin:0 auto 1.5rem">Juego de bluff y ruleta rusa para dos. ¿Quién miente más?</div>
-                <button class="nd-save" style="width:100%;max-width:280px" onclick="startLiarsBar()">Comenzar partida</button>
+                <button class="nd-save" style="width:100%;max-width:280px" onclick="createLiarsBarRoom()">Crear sala</button>
+              </div>
+            </div>
+
+            <!-- Waiting room: created before the actual game starts -->
+            <div id="liarsbar-waitroom" style="display:none">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+                <button class="study-btn" style="padding:6px 12px;min-height:36px;font-size:12px;width:auto" onclick="leaveLiarsBarRoom()">← Salir</button>
+                <div class="sec-title">Sala de espera</div>
+              </div>
+              <div style="text-align:center;padding:1rem 0">
+                <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:1rem" id="waitroom-status">Esperando jugadores...</div>
+
+                <div id="waitroom-players" style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.5rem"></div>
+
+                <button class="nd-cancel" style="width:100%;max-width:280px;margin-bottom:0.6rem" onclick="openFriendsInviteFromRoom()">Invitar amigo +</button>
+                <button class="nd-save" id="waitroom-start-btn" style="width:100%;max-width:280px;opacity:0.5" disabled onclick="hostStartGame()">Iniciar partida</button>
               </div>
             </div>
 
@@ -1054,6 +1069,16 @@
 
 
 
+<!-- FRIEND PICKER MODAL (for inviting from waiting room) -->
+<div class="modal-backdrop" id="backdrop-friendpicker" onclick="closeFriendPicker()"></div>
+<div class="modal-sheet" id="modal-friendpicker">
+  <div class="modal-inner">
+    <div class="m-handle"></div>
+    <div class="m-title">¿A quién invitas?</div>
+    <div id="friendpicker-list" style="max-height:360px;overflow-y:auto;margin-top:0.5rem"></div>
+  </div>
+</div>
+
 <!-- FRIENDS MODAL -->
 <div class="modal-backdrop" id="backdrop-friends" onclick="closeFriendsModal()"></div>
 <div class="modal-sheet" id="modal-friends">
@@ -1149,12 +1174,12 @@
     <div class="m-handle"></div>
     <div style="text-align:center;padding:0.5rem 0 1rem">
       <div style="font-size:3rem">🎮</div>
-      <div class="m-title" style="margin-bottom:4px">¡Invitación recibida!</div>
-      <div style="font-size:14px;font-weight:600;color:var(--text-muted)" id="invite-msg">¿Juguemos Liar's Bar?</div>
+      <div class="m-title" style="margin-bottom:4px" id="invite-title">Alguien te ha invitado a jugar</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text-muted)" id="invite-msg">¿Juguemos un ratito?</div>
     </div>
     <div class="nd-actions">
       <button class="nd-cancel" onclick="rejectInvite()">Rechazar</button>
-      <button class="nd-save" onclick="acceptInvite()">¡Jugar!</button>
+      <button class="nd-save" onclick="acceptInvite()">Aceptar</button>
     </div>
   </div>
 </div>
@@ -1760,7 +1785,7 @@ function searchFriendCandidates(query){
   searchDebounce = setTimeout(async ()=>{
     try {
       const { data, error } = await sb.from('profiles')
-        .select('id,name')
+        .select('id,name,photo_url')
         .ilike('name', `%${query.trim()}%`)
         .neq('id', currentUser.id)
         .limit(20);
@@ -1792,7 +1817,7 @@ function searchFriendCandidates(query){
           actionHtml = `<button class="friend-row-btn accept" onclick="sendFriendRequest('${u.id}')">Agregar</button>`;
         }
         return `<div class="friend-row">
-          <div class="friend-row-avatar">${(u.name||'?').charAt(0).toUpperCase()}</div>
+          ${friendAvatarHtml(u.name, u.photo_url)}
           <div class="friend-row-name">${u.name||'Sin nombre'}</div>
           ${actionHtml}
         </div>`;
@@ -1824,7 +1849,7 @@ async function loadFriendRequests(){
   const listEl = document.getElementById('friends-requests-list');
   try {
     const { data, error } = await sb.from('friend_requests')
-      .select('id,from_user,status,profiles!friend_requests_from_user_fkey(name)')
+      .select('id,from_user,status')
       .eq('to_user', currentUser.id)
       .eq('status', 'pending');
     if(error) throw error;
@@ -1842,13 +1867,23 @@ async function loadFriendRequests(){
       return;
     }
 
-    listEl.innerHTML = data.map(r=>`
+    // Fetch sender profiles separately (avoids depending on exact FK constraint names)
+    const fromIds = data.map(r=>r.from_user);
+    const { data: profiles } = await sb.from('profiles').select('id,name,photo_url').in('id', fromIds);
+    const profileMap = {};
+    (profiles||[]).forEach(p=>{ profileMap[p.id] = p; });
+
+    listEl.innerHTML = data.map(r=>{
+      const p = profileMap[r.from_user];
+      const name = p?.name || 'Sin nombre';
+      return `
       <div class="friend-row">
-        <div class="friend-row-avatar">${(r.profiles?.name||'?').charAt(0).toUpperCase()}</div>
-        <div class="friend-row-name">${r.profiles?.name||'Sin nombre'}</div>
+        ${friendAvatarHtml(name, p?.photo_url)}
+        <div class="friend-row-name">${name}</div>
         <button class="friend-row-btn reject" onclick="respondFriendRequest('${r.id}','rejected')">Rechazar</button>
         <button class="friend-row-btn accept" onclick="respondFriendRequest('${r.id}','accepted')">Aceptar</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e){
     console.error('loadFriendRequests error', e);
     listEl.innerHTML = '<div class="friends-empty">Error al cargar solicitudes</div>';
@@ -1870,25 +1905,14 @@ async function respondFriendRequest(requestId, status){
 async function loadFriendsList(){
   const listEl = document.getElementById('friends-list');
   try {
-    const { data, error } = await sb.from('friend_requests')
-      .select('from_user,to_user,profiles!friend_requests_from_user_fkey(id,name),profiles_to:profiles!friend_requests_to_user_fkey(id,name)')
-      .eq('status', 'accepted')
-      .or(`from_user.eq.${currentUser.id},to_user.eq.${currentUser.id}`);
-    if(error) throw error;
-
-    if(!data || data.length === 0){
+    const friends = await getMyFriends();
+    if(!friends || friends.length === 0){
       listEl.innerHTML = '<div class="friends-empty">Aún no tienes amigos agregados</div>';
       return;
     }
-
-    const friends = data.map(r=>{
-      const isFromMe = r.from_user === currentUser.id;
-      return isFromMe ? r.profiles_to : r.profiles;
-    }).filter(Boolean);
-
     listEl.innerHTML = friends.map(f=>`
       <div class="friend-row">
-        <div class="friend-row-avatar">${(f.name||'?').charAt(0).toUpperCase()}</div>
+        ${friendAvatarHtml(f.name, f.photo_url)}
         <div class="friend-row-name">${f.name||'Sin nombre'}</div>
       </div>`).join('');
   } catch(e){
@@ -1897,18 +1921,21 @@ async function loadFriendsList(){
   }
 }
 
-// Returns the current user's accepted friends as [{id, name}, ...]
+// Returns the current user's accepted friends as [{id, name, photo_url}, ...]
 async function getMyFriends(){
   try {
     const { data, error } = await sb.from('friend_requests')
-      .select('from_user,to_user,profiles!friend_requests_from_user_fkey(id,name),profiles_to:profiles!friend_requests_to_user_fkey(id,name)')
+      .select('from_user,to_user')
       .eq('status', 'accepted')
       .or(`from_user.eq.${currentUser.id},to_user.eq.${currentUser.id}`);
     if(error) throw error;
-    return (data||[]).map(r=>{
-      const isFromMe = r.from_user === currentUser.id;
-      return isFromMe ? r.profiles_to : r.profiles;
-    }).filter(Boolean);
+    if(!data || data.length === 0) return [];
+
+    // The "other" user's id in each accepted row
+    const otherIds = data.map(r => r.from_user === currentUser.id ? r.to_user : r.from_user);
+    const { data: profiles, error: profErr } = await sb.from('profiles').select('id,name,photo_url').in('id', otherIds);
+    if(profErr) throw profErr;
+    return profiles || [];
   } catch(e){
     console.error('getMyFriends error', e);
     return [];
@@ -1933,11 +1960,11 @@ async function loadProfile(){
 }
 
 function closeAllModals(){
-  ['backdrop-editprofile','backdrop-invite','backdrop-waiting','backdrop-nd','backdrop-idea','backdrop-spotify','backdrop-friends'].forEach(id=>{
+  ['backdrop-editprofile','backdrop-invite','backdrop-waiting','backdrop-nd','backdrop-idea','backdrop-spotify','backdrop-friends','backdrop-friendpicker'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.classList.remove('open');
   });
-  ['modal-editprofile','modal-invite','modal-waiting','modal-nd','modal-idea','modal-spotify','modal-friends'].forEach(id=>{
+  ['modal-editprofile','modal-invite','modal-waiting','modal-nd','modal-idea','modal-spotify','modal-friends','modal-friendpicker'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.classList.remove('open');
   });
@@ -2167,6 +2194,15 @@ function updateAvatarUI(name, photoUrl){
   document.getElementById('pm-name').textContent = name;
 }
 
+// Reusable small avatar HTML for friend rows / lists (photo or initial fallback)
+function friendAvatarHtml(name, photoUrl){
+  const initial = (name||'?').charAt(0).toUpperCase();
+  if(photoUrl){
+    return `<div class="friend-row-avatar" style="overflow:hidden;padding:0"><img src="${photoUrl}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>`;
+  }
+  return `<div class="friend-row-avatar">${initial}</div>`;
+}
+
 // ── LIAR'S BAR ────────────────────────────────────
 const LB_CARDS   = ['A','A','A','A','A','A','K','K','K','K','K','K','Q','Q','Q','Q','Q','Q','🃏','🃏'];
 const LB_NAMES   = { A:'As', K:'Rey', Q:'Reina', '🃏':'Comodín' };
@@ -2185,100 +2221,225 @@ function lbShuffle(arr){
 
 function lbBulletPos(){ return Math.floor(Math.random()*6); }
 
-function startLiarsBar(){
-  // Determine my player index based on who sent the invite
-  // The inviter is player 0, the accepter is player 1
-  const amInviter = currentInviteId === null; // inviter has no currentInviteId
-  lb = { myIdx: amInviter ? 0 : 1, sessionId: null, selected: [] };
+// ── LIAR'S BAR: ROOM-BASED FLOW ───────────────────
+let currentRoomId = null;
+let roomChannel = null;
 
-  document.getElementById('liarsbar-lobby').style.display = 'none';
-  document.getElementById('liarsbar-game').style.display  = 'block';
+async function createLiarsBarRoom(){
+  if(!currentUser){ showToast('No hay sesión activa'); return; }
+  try {
+    const state = {
+      phase: 'lobby', // lobby -> playing -> over
+      players: [{ id: currentUser.id, name: currentProfile?.name || 'Anfitrión' }],
+      hostId: currentUser.id,
+    };
+    const { data, error } = await sb.from('game_sessions').insert({
+      game_id: 'liarsbar',
+      state
+    }).select().single();
+    if(error) throw error;
 
-  if(amInviter){
-    // Create game session with initial state
-    lbCreateSession();
-  } else {
-    // Wait for session to be created by inviter
-    lbWatchSession();
+    currentRoomId = data.id;
+    document.getElementById('liarsbar-lobby').style.display = 'none';
+    document.getElementById('liarsbar-waitroom').style.display = 'block';
+    watchRoom();
+    renderWaitroom(state);
+  } catch(e){
+    console.error(e);
+    showToast('Error al crear la sala');
   }
 }
 
-async function lbCreateSession(){
-  const deck = lbShuffle([...LB_CARDS]);
-  const p0name = currentProfile?.name || 'Jugador 1';
-  const state = {
-    players: [
-      { name: p0name, hand: deck.slice(0,5), bullet: lbBulletPos(), shots: 0, alive: true },
-      { name: '...', hand: deck.slice(5,10), bullet: lbBulletPos(), shots: 0, alive: true },
-    ],
-    tableCard: LB_TABLE[Math.floor(Math.random()*3)],
-    turn: 0,
-    phase: 'waiting', // wait for player 2 name
-    lastPlay: null,
-    roundNum: 1,
-  };
-
-  const invId = pendingInviteId;
-  const { data, error } = await sb.from('game_sessions').insert({
-    invite_id: invId,
-    game_id: 'liarsbar',
-    state
-  }).select().single();
-
-  if(error){ showToast('Error creando sesión'); return; }
-  lb.sessionId = data.id;
-  lb.state = state;
-  lbWatchSession();
-  lbRender();
-}
-
-function lbWatchSession(){
-  sb.channel('lb-session')
+function watchRoom(){
+  roomChannel = sb.channel('room-' + currentRoomId)
     .on('postgres_changes', {
-      event: '*', schema: 'public', table: 'game_sessions'
-    }, async e => {
-      // Find session for our invite
-      const { data } = await sb.from('game_sessions')
-        .select('*')
-        .or(`invite_id.eq.${pendingInviteId || '00000000-0000-0000-0000-000000000000'},invite_id.eq.${currentInviteId || '00000000-0000-0000-0000-000000000000'}`)
-        .single();
-      if(!data) return;
-      lb.sessionId = data.id;
-      lb.state = data.state;
-      // If I'm player 2 and session just created, update my name
-      if(lb.myIdx === 1 && lb.state.players[1].name === '...'){
-        const newState = { ...lb.state };
-        newState.players[1].name = currentProfile?.name || 'Jugador 2';
-        newState.phase = 'play';
-        await lbPushState(newState);
-      } else {
-        lb.state = data.state;
-        lbRender();
+      event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: `id=eq.${currentRoomId}`
+    }, e => {
+      const state = e.new.state;
+      if(state.phase === 'playing' && document.getElementById('liarsbar-waitroom').style.display !== 'none'){
+        // Host started the game — everyone transitions together
+        enterActiveGame(state);
+      } else if(state.phase === 'lobby'){
+        renderWaitroom(state);
       }
     })
     .subscribe();
+}
 
-  // Also load current state if session exists
-  if(lb.myIdx === 1){
-    setTimeout(async ()=>{
-      const { data } = await sb.from('game_sessions')
-        .select('*')
-        .eq('invite_id', currentInviteId)
-        .single();
-      if(data){
-        lb.sessionId = data.id;
-        lb.state = data.state;
-        if(lb.state.players[1].name === '...'){
-          const newState = { ...lb.state };
-          newState.players[1].name = currentProfile?.name || 'Jugador 2';
-          newState.phase = 'play';
-          await lbPushState(newState);
-        } else {
-          lbRender();
-        }
-      }
-    }, 1000);
+function renderWaitroom(state){
+  const isHost = state.hostId === currentUser.id;
+  document.getElementById('waitroom-status').textContent =
+    state.players.length < 2 ? 'Esperando a que se una alguien...' : '¡Listos para empezar!';
+
+  document.getElementById('waitroom-players').innerHTML = state.players.map(p=>`
+    <div class="friend-row" style="border:1px solid var(--border);border-radius:12px;padding:0.6rem 0.75rem">
+      <div class="friend-row-avatar">${(p.name||'?').charAt(0).toUpperCase()}</div>
+      <div class="friend-row-name">${p.name}${p.id===state.hostId?' (anfitrión)':''}</div>
+      <span style="font-size:12px;font-weight:700;color:var(--green)">● conectado</span>
+    </div>`).join('');
+
+  const startBtn = document.getElementById('waitroom-start-btn');
+  if(isHost){
+    startBtn.style.display = 'block';
+    startBtn.disabled = state.players.length < 2;
+    startBtn.style.opacity = state.players.length < 2 ? '0.5' : '1';
+  } else {
+    startBtn.style.display = 'none';
   }
+}
+
+async function openFriendsInviteFromRoom(){
+  const friends = await getMyFriends();
+  if(!friends || friends.length === 0){
+    showToast('Agrega un amigo primero para invitarlo');
+    openFriendsModal();
+    return;
+  }
+
+  const listEl = document.getElementById('friendpicker-list');
+  listEl.innerHTML = friends.map(f=>`
+    <div class="friend-row" style="cursor:pointer" onclick="sendRoomInvite('${f.id}','${(f.name||'Jugador').replace(/'/g,"\\'")}')">
+      ${friendAvatarHtml(f.name, f.photo_url)}
+      <div class="friend-row-name">${f.name||'Sin nombre'}</div>
+      <span style="font-size:12px;font-weight:700;color:var(--accent)">Invitar</span>
+    </div>`).join('');
+
+  document.getElementById('modal-friendpicker').classList.add('open');
+  document.getElementById('backdrop-friendpicker').classList.add('open');
+}
+
+function closeFriendPicker(){
+  document.getElementById('modal-friendpicker').classList.remove('open');
+  document.getElementById('backdrop-friendpicker').classList.remove('open');
+}
+
+async function sendRoomInvite(targetId, targetName){
+  closeFriendPicker();
+  try {
+    const { data: invite, error } = await sb.from('game_invites').insert({
+      from_user: currentUser.id,
+      to_user: targetId,
+      game_id: 'liarsbar',
+      game_name: "Liar's Bar",
+      status: 'pending',
+      room_id: currentRoomId,
+    }).select().single();
+
+    if(error){
+      // Surface the real Supabase error instead of a generic message —
+      // this is what tells us WHY an invite isn't reaching the other user
+      // (e.g. missing room_id column, RLS policy, etc.)
+      console.error('game_invites insert error:', error);
+      showToast('Error al invitar: ' + error.message);
+      return;
+    }
+
+    showToast('Invitación enviada a ' + targetName);
+
+    // Send push notification (reuses existing send-invite Edge Function)
+    const { data: tokenData, error: tokenErr } = await sb.from('push_tokens').select('token').eq('user_id', targetId).single();
+    if(tokenErr){ console.error('push_tokens lookup error:', tokenErr); }
+
+    if(tokenData?.token){
+      const session = await sb.auth.getSession();
+      const res = await fetch(`${SUPA_URL}/functions/v1/send-invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.data.session.access_token}`
+        },
+        body: JSON.stringify({
+          token: tokenData.token,
+          gameId: 'liarsbar', gameName: "Liar's Bar",
+          senderName: currentProfile?.name || 'Alguien',
+          inviteId: invite.id
+        })
+      });
+      if(!res.ok){
+        const errBody = await res.text();
+        console.error('send-invite function failed:', res.status, errBody);
+      }
+    } else {
+      console.log('No push token found for', targetName, '— they may not have opened the app yet on this device.');
+    }
+  } catch(e){
+    console.error('sendRoomInvite exception:', e);
+    showToast('Error al enviar invitación: ' + e.message);
+  }
+}
+
+async function joinLiarsBarRoom(roomId){
+  try {
+    const { data, error } = await sb.from('game_sessions').select('*').eq('id', roomId).single();
+    if(error || !data) throw error || new Error('Room not found');
+
+    currentRoomId = roomId;
+    const state = { ...data.state };
+    if(!state.players.find(p=>p.id === currentUser.id)){
+      state.players.push({ id: currentUser.id, name: currentProfile?.name || 'Jugador' });
+      await sb.from('game_sessions').update({ state, updated_at: new Date().toISOString() }).eq('id', roomId);
+    }
+
+    goPage(3);
+    setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
+    document.getElementById('liarsbar-lobby').style.display = 'none';
+    document.getElementById('liarsbar-waitroom').style.display = 'block';
+    watchRoom();
+    renderWaitroom(state);
+  } catch(e){
+    console.error(e);
+    showToast('No se pudo unir a la sala — puede que ya no exista');
+  }
+}
+
+async function hostStartGame(){
+  if(!currentRoomId) return;
+  try {
+    const { data } = await sb.from('game_sessions').select('*').eq('id', currentRoomId).single();
+    if(!data) return;
+    const state = { ...data.state };
+    if(state.hostId !== currentUser.id) return; // safety: only host starts
+
+    // Build the actual Liar's Bar game state now that we know all players
+    const deck = lbShuffle([...LB_CARDS]);
+    const p0 = state.players[0];
+    const p1 = state.players[1];
+    const gameState = {
+      phase: 'playing',
+      hostId: state.hostId,
+      roomPlayers: state.players,
+      players: [
+        { id: p0.id, name: p0.name, hand: deck.slice(0,5), bullet: lbBulletPos(), shots: 0, alive: true },
+        { id: p1.id, name: p1.name, hand: deck.slice(5,10), bullet: lbBulletPos(), shots: 0, alive: true },
+      ],
+      tableCard: LB_TABLE[Math.floor(Math.random()*3)],
+      turn: 0,
+      lastPlay: null,
+      roundNum: 1,
+    };
+
+    await sb.from('game_sessions').update({ state: gameState, updated_at: new Date().toISOString() }).eq('id', currentRoomId);
+    enterActiveGame(gameState);
+  } catch(e){
+    console.error(e);
+    showToast('Error al iniciar la partida');
+  }
+}
+
+function enterActiveGame(gameState){
+  const myIdx = gameState.players.findIndex(p => p.id === currentUser.id);
+  lb = { myIdx: myIdx >= 0 ? myIdx : 0, sessionId: currentRoomId, selected: [], state: gameState };
+
+  document.getElementById('liarsbar-waitroom').style.display = 'none';
+  document.getElementById('liarsbar-game').style.display = 'block';
+  lbRender();
+}
+
+function leaveLiarsBarRoom(){
+  if(roomChannel){ sb.removeChannel(roomChannel); roomChannel = null; }
+  currentRoomId = null;
+  document.getElementById('liarsbar-waitroom').style.display = 'none';
+  document.getElementById('liarsbar-lobby').style.display = 'block';
 }
 
 async function lbPushState(newState){
@@ -2290,8 +2451,10 @@ async function lbPushState(newState){
 
 function resetLiarsBar(){
   lb = null;
-  sb.channel('lb-session').unsubscribe();
+  if(roomChannel){ sb.removeChannel(roomChannel); roomChannel = null; }
+  currentRoomId = null;
   document.getElementById('liarsbar-lobby').style.display = 'block';
+  document.getElementById('liarsbar-waitroom').style.display = 'none';
   document.getElementById('liarsbar-game').style.display  = 'none';
   document.getElementById('lb-roulette-result').style.display = 'none';
 }
@@ -2522,7 +2685,10 @@ function openLiarsBar(){
 
 function closeLiarsBar(){
   lb = null;
+  if(roomChannel){ sb.removeChannel(roomChannel); roomChannel = null; }
+  currentRoomId = null;
   document.getElementById('liarsbar-lobby').style.display = 'block';
+  document.getElementById('liarsbar-waitroom').style.display = 'none';
   document.getElementById('liarsbar-game').style.display  = 'none';
   document.getElementById('lb-roulette-result').style.display = 'none';
   document.getElementById('liarsbar-screen').style.display     = 'none';
@@ -2533,65 +2699,6 @@ function closeLiarsBar(){
 let currentInviteId = null;
 let pendingInviteId = null;
 
-async function inviteToGame(gameId, gameName){
-  if(!currentUser){ showToast('No hay sesión activa'); return; }
-  try {
-    // Only friends can be invited to games now
-    const friends = await getMyFriends();
-    if(!friends || friends.length === 0){
-      showToast('Agrega un amigo primero para invitarlo a jugar');
-      openFriendsModal();
-      return;
-    }
-    const target = friends[0];
-
-    // Create invite in DB
-    const { data: invite, error } = await sb.from('game_invites').insert({
-      from_user: currentUser.id,
-      to_user: target.id,
-      game_id: gameId,
-      game_name: gameName,
-      status: 'pending'
-    }).select().single();
-    if(error) throw error;
-    pendingInviteId = invite.id;
-
-    // Show waiting screen
-    document.getElementById('waiting-msg').textContent = `¿Juguemos ${gameName}? enviado a ${target.name}`;
-    document.getElementById('modal-waiting').classList.add('open');
-    document.getElementById('backdrop-waiting').classList.add('open');
-
-    // Send OneSignal push notification
-    const { data: tokenData } = await sb.from('push_tokens').select('token').eq('user_id', target.id).single();
-    if(tokenData?.token){
-      const session = await sb.auth.getSession();
-      const res = await fetch(`${SUPA_URL}/functions/v1/send-invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.data.session.access_token}`
-        },
-        body: JSON.stringify({
-          token: tokenData.token,
-          gameId, gameName,
-          senderName: currentProfile?.name || 'Alguien',
-          inviteId: invite.id
-        })
-      });
-      if(!res.ok){
-        const errBody = await res.text();
-        console.error('send-invite failed:', res.status, errBody);
-        showToast('Notificación no enviada');
-      }
-    } else {
-      showToast('La otra persona aún no tiene notificaciones activadas');
-    }
-  } catch(e){
-    console.error(e);
-    showToast('Error al enviar invitación');
-  }
-}
-
 async function cancelInvite(){
   if(pendingInviteId){
     await sb.from('game_invites').update({status:'rejected'}).eq('id', pendingInviteId);
@@ -2601,10 +2708,21 @@ async function cancelInvite(){
   document.getElementById('backdrop-waiting').classList.remove('open');
 }
 
-function handleIncomingInvite(invite){
+let currentInviteRoomId = null;
+
+async function handleIncomingInvite(invite){
   currentInviteId = invite.id;
-  const msg = `${invite.game_name} — ¿aceptas jugar?`;
-  document.getElementById('invite-msg').textContent = msg;
+  currentInviteRoomId = invite.room_id || null;
+
+  // Look up the inviter's name to show "USUARIO te ha invitado a jugar <juego>"
+  let inviterName = 'Alguien';
+  try {
+    const { data } = await sb.from('profiles').select('name').eq('id', invite.from_user).single();
+    if(data?.name) inviterName = data.name;
+  } catch(e){ console.error('Could not fetch inviter name', e); }
+
+  document.getElementById('invite-title').textContent = `${inviterName} te ha invitado a jugar ${invite.game_name}`;
+  document.getElementById('invite-msg').textContent = '¿Juguemos un ratito?';
   document.getElementById('modal-invite').classList.add('open');
   document.getElementById('backdrop-invite').classList.add('open');
 }
@@ -2614,18 +2732,24 @@ async function acceptInvite(){
   await sb.from('game_invites').update({status:'accepted'}).eq('id', currentInviteId);
   document.getElementById('modal-invite').classList.remove('open');
   document.getElementById('backdrop-invite').classList.remove('open');
-  // Go to the game
-  goPage(3);
-  setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
-  openLiarsBar();
-  startLiarsBar();
+
+  // Join the host's waiting room — the game does NOT start automatically.
+  // The host must press "Iniciar partida" once everyone is in.
+  if(currentInviteRoomId){
+    goPage(3);
+    setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
+    openLiarsBar();
+    joinLiarsBarRoom(currentInviteRoomId);
+  }
   currentInviteId = null;
+  currentInviteRoomId = null;
 }
 
 async function rejectInvite(){
   if(currentInviteId){
     await sb.from('game_invites').update({status:'rejected'}).eq('id', currentInviteId);
     currentInviteId = null;
+    currentInviteRoomId = null;
   }
   document.getElementById('modal-invite').classList.remove('open');
   document.getElementById('backdrop-invite').classList.remove('open');
@@ -2638,11 +2762,10 @@ function handleInviteResponse(invite){
   pendingInviteId = null;
 
   if(invite.status === 'accepted'){
-    showToast('¡Invitación aceptada! Entrando al juego...');
-    goPage(3);
-    setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
-    openLiarsBar();
-    startLiarsBar();
+    showToast('¡Tu amigo se unió a la sala!');
+    // No auto-start here — the host stays in the waiting room and presses
+    // "Iniciar partida" manually once ready. The room's realtime listener
+    // (watchRoom) already re-renders the player list on its own.
   } else {
     showToast('Invitación rechazada 😕');
   }
