@@ -707,7 +707,26 @@
       </div>
       <div style="margin-bottom:0.9rem">
         <div style="font-size:11px;font-weight:800;color:#5C1528;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Contraseña</div>
-        <input id="auth-pass" type="password" placeholder="········" autocomplete="current-password" style="width:100%;padding:0.7rem 0.85rem;border:1.5px solid rgba(140,40,70,0.35);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#1A0008;background:#F5D0DC;outline:none;min-height:48px;box-sizing:border-box">
+        <div style="position:relative">
+          <input id="auth-pass" type="password" placeholder="········" autocomplete="current-password" oninput="onAuthPassInput()" style="width:100%;padding:0.7rem 2.6rem 0.7rem 0.85rem;border:1.5px solid rgba(140,40,70,0.35);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#1A0008;background:#F5D0DC;outline:none;min-height:48px;box-sizing:border-box">
+          <button type="button" onclick="togglePassVisibility('auth-pass','auth-pass-eye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;font-size:18px;line-height:1" id="auth-pass-eye">👁</button>
+        </div>
+        <div id="auth-pass-strength" style="display:none;margin-top:6px">
+          <div style="display:flex;gap:4px;margin-bottom:3px">
+            <div class="pw-strength-bar" id="pw-bar-1" style="height:4px;flex:1;border-radius:2px;background:#E0C5CE"></div>
+            <div class="pw-strength-bar" id="pw-bar-2" style="height:4px;flex:1;border-radius:2px;background:#E0C5CE"></div>
+            <div class="pw-strength-bar" id="pw-bar-3" style="height:4px;flex:1;border-radius:2px;background:#E0C5CE"></div>
+          </div>
+          <div id="pw-strength-label" style="font-size:11px;font-weight:700;color:#5C1528"></div>
+        </div>
+      </div>
+      <div id="auth-confirm-group" style="display:none;margin-bottom:0.9rem">
+        <div style="font-size:11px;font-weight:800;color:#5C1528;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Confirmar contraseña</div>
+        <div style="position:relative">
+          <input id="auth-pass-confirm" type="password" placeholder="········" oninput="checkPassMatch()" style="width:100%;padding:0.7rem 2.6rem 0.7rem 0.85rem;border:1.5px solid rgba(140,40,70,0.35);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#1A0008;background:#F5D0DC;outline:none;min-height:48px;box-sizing:border-box">
+          <button type="button" onclick="togglePassVisibility('auth-pass-confirm','auth-confirm-eye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;font-size:18px;line-height:1" id="auth-confirm-eye">👁</button>
+        </div>
+        <div id="auth-confirm-msg" style="font-size:11px;font-weight:700;margin-top:4px;display:none"></div>
       </div>
       <div id="auth-name-group" style="display:none;margin-bottom:0.9rem">
         <div style="font-size:11px;font-weight:800;color:#5C1528;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px">Tu nombre</div>
@@ -723,7 +742,7 @@
   <!-- HEADER -->
   <div id="header">
     <div class="header-top">
-      <div class="logo">monki<em>trip</em><span class="logo-v">v0.0.4</span></div>
+      <div class="logo">monki<em>trip</em><span class="logo-v">v0.0.5</span></div>
       <div class="header-right">
         <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()">Oscuro</button>
         <div class="avatar" id="user-avatar" onclick="toggleProfileMenu()">V</div>
@@ -1325,6 +1344,8 @@ function showToast(msg, duration=2500){
 function authSetTab(mode){
   authMode = mode;
   document.getElementById('auth-name-group').style.display = mode==='register' ? 'block' : 'none';
+  document.getElementById('auth-confirm-group').style.display = mode==='register' ? 'block' : 'none';
+  document.getElementById('auth-pass-strength').style.display = mode==='register' ? 'block' : 'none';
   document.getElementById('auth-btn').textContent = mode==='register' ? 'Crear cuenta' : 'Entrar';
   document.getElementById('auth-error').style.display = 'none';
   const loginTab = document.getElementById('tab-login');
@@ -1335,6 +1356,68 @@ function authSetTab(mode){
 
 // Legacy alias
 function switchAuthTab(mode, btn){ authSetTab(mode); }
+
+function togglePassVisibility(inputId, eyeId){
+  const input = document.getElementById(inputId);
+  const eye = document.getElementById(eyeId);
+  if(input.type === 'password'){
+    input.type = 'text';
+    eye.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    eye.textContent = '👁';
+  }
+}
+
+function onAuthPassInput(){
+  if(authMode === 'register') updatePasswordStrength();
+  checkPassMatch();
+}
+
+function updatePasswordStrength(){
+  const pass = document.getElementById('auth-pass').value;
+  const bars = [document.getElementById('pw-bar-1'), document.getElementById('pw-bar-2'), document.getElementById('pw-bar-3')];
+  const label = document.getElementById('pw-strength-label');
+
+  if(!pass){
+    bars.forEach(b => b.style.background = '#E0C5CE');
+    label.textContent = '';
+    return;
+  }
+
+  let score = 0;
+  if(pass.length >= 6) score++;
+  if(pass.length >= 10 && /[A-Z]/.test(pass) && /[0-9]/.test(pass)) score++;
+  if(pass.length >= 10 && /[^A-Za-z0-9]/.test(pass) && /[A-Z]/.test(pass) && /[0-9]/.test(pass)) score++;
+
+  const colors = ['#B02050', '#D4A017', '#1A5C35'];
+  const labels = ['Débil', 'Media', 'Fuerte'];
+  const level = Math.max(1, score);
+
+  bars.forEach((b, i) => { b.style.background = i < level ? colors[level-1] : '#E0C5CE'; });
+  label.textContent = labels[level-1];
+  label.style.color = colors[level-1];
+}
+
+function checkPassMatch(){
+  if(authMode !== 'register') return;
+  const pass = document.getElementById('auth-pass').value;
+  const confirm = document.getElementById('auth-pass-confirm').value;
+  const msgEl = document.getElementById('auth-confirm-msg');
+
+  if(!confirm){
+    msgEl.style.display = 'none';
+    return;
+  }
+  msgEl.style.display = 'block';
+  if(pass === confirm){
+    msgEl.textContent = '✓ Las contraseñas coinciden';
+    msgEl.style.color = '#1A5C35';
+  } else {
+    msgEl.textContent = '✗ Las contraseñas no coinciden';
+    msgEl.style.color = '#B02050';
+  }
+}
 
 let authInProgress = false;
 
@@ -1353,7 +1436,10 @@ async function handleAuth(){
   try {
     if(authMode==='register'){
       const name = document.getElementById('auth-name').value.trim();
+      const confirm = document.getElementById('auth-pass-confirm').value;
       if(!name){showAuthError('Ingresa tu nombre.'); return;}
+      if(pass.length < 6){showAuthError('La contraseña debe tener al menos 6 caracteres.'); return;}
+      if(pass !== confirm){showAuthError('Las contraseñas no coinciden.'); return;}
       const {data,error} = await sb.auth.signUp({email,password:pass});
       if(error) throw error;
       if(data.user){
@@ -1429,6 +1515,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Going to background: disconnect realtime cleanly
         try {
           if(realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+          if(presenceChannel){ sb.removeChannel(presenceChannel); presenceChannel = null; }
           sb.realtime.disconnect();
         } catch(e){ appLog('Error disconnecting realtime: ' + e.message); }
       } else {
@@ -1544,17 +1631,41 @@ async function recoverAppState(){
   }
 }
 
-// ── LIGHTWEIGHT LOGGER ──────────────────────────────
-// Keeps the last 50 lifecycle/network events in memory for debugging.
-// Not shown to the user; accessible via getAppLogs() in dev tools console.
+// ── CENTRAL LOGGER ──────────────────────────────────
+// Keeps the last 150 events in memory for debugging. Not shown to the
+// user directly; accessible via getAppLogs() in Chrome DevTools console.
+// Replaces scattered console.log calls with leveled, timestamped entries.
 const appLogBuffer = [];
-function appLog(msg){
-  const entry = new Date().toISOString() + ' — ' + msg;
+
+function _logWrite(level, msg, data){
+  const entry = {
+    t: new Date().toISOString(),
+    level,
+    msg,
+    data: data !== undefined ? data : null,
+  };
   appLogBuffer.push(entry);
-  if(appLogBuffer.length > 50) appLogBuffer.shift();
-  console.log('[monkitrip]', msg);
+  if(appLogBuffer.length > 150) appLogBuffer.shift();
+
+  const line = `[monkitrip:${level}] ${msg}`;
+  if(level === 'error') console.error(line, data ?? '');
+  else if(level === 'warn') console.warn(line, data ?? '');
+  else console.log(line, data ?? '');
 }
-window.getAppLogs = () => appLogBuffer.join('\n');
+
+const Logger = {
+  info:  (msg, data) => _logWrite('info', msg, data),
+  warn:  (msg, data) => _logWrite('warn', msg, data),
+  error: (msg, data) => _logWrite('error', msg, data),
+  debug: (msg, data) => _logWrite('debug', msg, data),
+};
+
+// Backward-compatible alias used by earlier lifecycle code
+function appLog(msg){ Logger.info(msg); }
+
+window.getAppLogs = () => appLogBuffer
+  .map(e => `${e.t} [${e.level}] ${e.msg}${e.data ? ' :: ' + JSON.stringify(e.data) : ''}`)
+  .join('\n');
 
 // Touch swipe
 (function(){
@@ -1595,7 +1706,7 @@ function renderNotes(){
   list.innerHTML = notes.map((n,i)=>`
     <div class="check-item">
       <div class="check-box${n.done?' done':''}" onclick="toggleNote(${i})"></div>
-      <span class="check-text${n.done?' done':''}">${n.text}</span>
+      <span class="check-text${n.done?' done':''}">${escapeHtml(n.text)}</span>
       <button class="check-del" onclick="deleteNote(${i})">×</button>
     </div>`).join('');
 }
@@ -1818,7 +1929,7 @@ function searchFriendCandidates(query){
         }
         return `<div class="friend-row">
           ${friendAvatarHtml(u.name, u.photo_url)}
-          <div class="friend-row-name">${u.name||'Sin nombre'}</div>
+          <div class="friend-row-name">${escapeHtml(u.name)||'Sin nombre'}</div>
           ${actionHtml}
         </div>`;
       }).join('');
@@ -1879,7 +1990,7 @@ async function loadFriendRequests(){
       return `
       <div class="friend-row">
         ${friendAvatarHtml(name, p?.photo_url)}
-        <div class="friend-row-name">${name}</div>
+        <div class="friend-row-name">${escapeHtml(name)}</div>
         <button class="friend-row-btn reject" onclick="respondFriendRequest('${r.id}','rejected')">Rechazar</button>
         <button class="friend-row-btn accept" onclick="respondFriendRequest('${r.id}','accepted')">Aceptar</button>
       </div>`;
@@ -1894,10 +2005,11 @@ async function respondFriendRequest(requestId, status){
   try {
     const { error } = await sb.from('friend_requests').update({ status }).eq('id', requestId);
     if(error) throw error;
+    cacheInvalidate('friends:' + currentUser.id); // relationship changed — force fresh data next time
     showToast(status === 'accepted' ? '¡Ahora son amigos!' : 'Solicitud rechazada');
     loadFriendRequests();
   } catch(e){
-    console.error(e);
+    Logger.error('RESPOND_FRIEND_REQUEST_FAILED', { message: e.message });
     showToast('Error al responder solicitud');
   }
 }
@@ -1912,8 +2024,9 @@ async function loadFriendsList(){
     }
     listEl.innerHTML = friends.map(f=>`
       <div class="friend-row">
-        ${friendAvatarHtml(f.name, f.photo_url)}
-        <div class="friend-row-name">${f.name||'Sin nombre'}</div>
+        ${friendAvatarHtml(f.name, f.photo_url, f.id)}
+        <div class="friend-row-name">${escapeHtml(f.name)||'Sin nombre'}</div>
+        <span style="font-size:11px;font-weight:700;color:${isFriendOnline(f.id)?'var(--green)':'var(--text-muted)'}">${isFriendOnline(f.id)?'En línea':'Desconectado'}</span>
       </div>`).join('');
   } catch(e){
     console.error('loadFriendsList error', e);
@@ -1922,22 +2035,29 @@ async function loadFriendsList(){
 }
 
 // Returns the current user's accepted friends as [{id, name, photo_url}, ...]
-async function getMyFriends(){
+async function getMyFriends(forceRefresh){
+  const cacheKey = 'friends:' + currentUser.id;
+  if(!forceRefresh){
+    const cached = cacheGet(cacheKey);
+    if(cached !== undefined) return cached;
+  }
   try {
     const { data, error } = await sb.from('friend_requests')
       .select('from_user,to_user')
       .eq('status', 'accepted')
       .or(`from_user.eq.${currentUser.id},to_user.eq.${currentUser.id}`);
     if(error) throw error;
-    if(!data || data.length === 0) return [];
+    if(!data || data.length === 0){ cacheSet(cacheKey, [], 60000); return []; }
 
     // The "other" user's id in each accepted row
     const otherIds = data.map(r => r.from_user === currentUser.id ? r.to_user : r.from_user);
     const { data: profiles, error: profErr } = await sb.from('profiles').select('id,name,photo_url').in('id', otherIds);
     if(profErr) throw profErr;
-    return profiles || [];
+    const result = profiles || [];
+    cacheSet(cacheKey, result, 60000); // 60s TTL
+    return result;
   } catch(e){
-    console.error('getMyFriends error', e);
+    Logger.error('GET_MY_FRIENDS_FAILED', { message: e.message });
     return [];
   }
 }
@@ -2007,6 +2127,47 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'game_invites',filter:`to_user=eq.${currentUser.id}`}, e=>handleIncomingInvite(e.new))
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'game_invites',filter:`from_user=eq.${currentUser.id}`}, e=>handleInviteResponse(e.new))
     .subscribe();
+
+  subscribePresence();
+}
+
+// ── ONLINE STATUS (Supabase Realtime Presence) ────
+let presenceChannel = null;
+let onlineUserIds = new Set();
+
+function subscribePresence(){
+  if(presenceChannel){ sb.removeChannel(presenceChannel); presenceChannel = null; }
+
+  presenceChannel = sb.channel('online-users', {
+    config: { presence: { key: currentUser.id } }
+  });
+
+  presenceChannel
+    .on('presence', { event: 'sync' }, () => {
+      const state = presenceChannel.presenceState();
+      onlineUserIds = new Set(Object.keys(state));
+      refreshOnlineIndicators();
+    })
+    .subscribe(async (status) => {
+      if(status === 'SUBSCRIBED'){
+        await presenceChannel.track({ online_at: new Date().toISOString() });
+      }
+    });
+}
+
+function isFriendOnline(userId){
+  return onlineUserIds.has(userId);
+}
+
+// Re-render whichever friend UI is currently visible so the green dot
+// updates live without needing to reopen the modal
+function refreshOnlineIndicators(){
+  if(document.getElementById('modal-friends')?.classList.contains('open')){
+    if(friendsTab === 'list') loadFriendsList();
+  }
+  if(document.getElementById('liarsbar-waitroom')?.style.display === 'block' && lb?.state){
+    renderWaitroom(lb.state);
+  }
 }
 
 // ─── LOAD DATA ─────────────────────────────────────
@@ -2100,6 +2261,22 @@ function closeEditProfile(){
   pendingPhotoUrl = null;
 }
 
+// ── SECURITY: HTML ESCAPING ────────────────────────
+// User-controlled strings (names, notes, titles, descriptions) must NEVER
+// be inserted into innerHTML raw — a malicious profile name like
+// <img src=x onerror=...> would execute arbitrary JS for anyone who views
+// it in a friends list, waiting room, or search result. Every user-supplied
+// field rendered via innerHTML must go through this first.
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function timeoutPromise(promise, ms, label){
   return Promise.race([
     promise,
@@ -2107,9 +2284,53 @@ function timeoutPromise(promise, ms, label){
   ]);
 }
 
+// ── SIMPLE IN-MEMORY CACHE ─────────────────────────
+// Avoids re-querying Supabase for the same data when switching tabs
+// quickly. Each entry has a TTL; Realtime events or explicit user actions
+// invalidate the relevant key immediately so data never goes stale.
+const _cache = new Map();
+
+function cacheGet(key){
+  const entry = _cache.get(key);
+  if(!entry) return undefined;
+  if(Date.now() > entry.expiresAt){ _cache.delete(key); return undefined; }
+  return entry.value;
+}
+function cacheSet(key, value, ttlMs = 60000){
+  _cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+function cacheInvalidate(key){
+  _cache.delete(key);
+}
+function cacheInvalidatePrefix(prefix){
+  for(const k of _cache.keys()){
+    if(k.startsWith(prefix)) _cache.delete(k);
+  }
+}
+
 async function handleProfilePhoto(input){
   if(!input.files || !input.files.length) return;
   const file = input.files[0];
+
+  // Security: validate file type and size before doing anything with it —
+  // without this, any file (regardless of real content) could be uploaded
+  // to storage, and huge files could be used to abuse storage/bandwidth.
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  const maxSizeBytes = 8 * 1024 * 1024; // 8MB
+
+  if(!allowedTypes.includes(file.type)){
+    showToast('Formato no permitido — usa JPG, PNG o WEBP');
+    Logger.warn('PHOTO_UPLOAD_REJECTED_TYPE', { type: file.type });
+    input.value = '';
+    return;
+  }
+  if(file.size > maxSizeBytes){
+    showToast('La imagen es muy grande — máximo 8MB');
+    Logger.warn('PHOTO_UPLOAD_REJECTED_SIZE', { size: file.size });
+    input.value = '';
+    return;
+  }
+
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `avatars/${currentUser.id}/avatar.${ext}`;
   const statusEl = document.getElementById('ep-upload-status');
@@ -2134,7 +2355,7 @@ async function handleProfilePhoto(input){
     statusEl.textContent = 'Subiendo...';
 
     // Remove previous file (ignore errors if it doesn't exist)
-    try { await timeoutPromise(sb.storage.from('photos').remove([path]), 8000, 'Eliminar anterior'); } catch(e) {}
+    try { await timeoutPromise(sb.storage.from('photos').remove([path]), 8000, 'Eliminar anterior'); } catch(e){ Logger.debug('PHOTO_CLEANUP_SKIP', { message: e.message }); }
 
     const { error: upErr } = await timeoutPromise(
       sb.storage.from('photos').upload(path, file, { cacheControl:'3600', upsert:true, contentType:file.type }),
@@ -2195,12 +2416,29 @@ function updateAvatarUI(name, photoUrl){
 }
 
 // Reusable small avatar HTML for friend rows / lists (photo or initial fallback)
-function friendAvatarHtml(name, photoUrl){
+function friendAvatarHtml(name, photoUrl, userId){
   const initial = (name||'?').charAt(0).toUpperCase();
-  if(photoUrl){
-    return `<div class="friend-row-avatar" style="overflow:hidden;padding:0"><img src="${photoUrl}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>`;
-  }
-  return `<div class="friend-row-avatar">${initial}</div>`;
+  const showDot = !!userId;
+  const online = showDot && isFriendOnline(userId);
+
+  // Exact requested style: green fill + purple border when online,
+  // gray fill + pink border when offline
+  const dotHtml = showDot
+    ? `<span style="position:absolute;bottom:-1px;right:-1px;width:13px;height:13px;border-radius:50%;
+         border:2px solid ${online?'#A87EF5':'#B02050'};
+         background:${online?'#3FBE5C':'#B0B0B8'};
+         z-index:2;"></span>`
+    : '';
+
+  // Photo (if any) sits in its own overflow-hidden circle so the status
+  // dot — a sibling — is never clipped by the photo's rounding.
+  const photoHtml = photoUrl
+    ? `<div style="width:100%;height:100%;border-radius:50%;overflow:hidden">
+         <img src="${photoUrl}" alt="${name}" style="width:100%;height:100%;object-fit:cover">
+       </div>`
+    : initial;
+
+  return `<div class="friend-row-avatar" style="position:relative;overflow:visible;${photoUrl?'padding:0':''}">${photoHtml}${dotHtml}</div>`;
 }
 
 // ── LIAR'S BAR ────────────────────────────────────
@@ -2227,6 +2465,7 @@ let roomChannel = null;
 
 async function createLiarsBarRoom(){
   if(!currentUser){ showToast('No hay sesión activa'); return; }
+  Logger.info('ROOM_CREATE_ATTEMPT', { userId: currentUser.id });
   try {
     const state = {
       phase: 'lobby', // lobby -> playing -> over
@@ -2237,15 +2476,19 @@ async function createLiarsBarRoom(){
       game_id: 'liarsbar',
       state
     }).select().single();
-    if(error) throw error;
+    if(error){
+      Logger.error('ROOM_CREATE_FAILED', { message: error.message, code: error.code });
+      throw error;
+    }
 
     currentRoomId = data.id;
+    Logger.info('ROOM_CREATED', { roomId: data.id });
     document.getElementById('liarsbar-lobby').style.display = 'none';
     document.getElementById('liarsbar-waitroom').style.display = 'block';
     watchRoom();
     renderWaitroom(state);
   } catch(e){
-    console.error(e);
+    Logger.error('ROOM_CREATE_EXCEPTION', { message: e.message });
     showToast('Error al crear la sala');
   }
 }
@@ -2271,12 +2514,15 @@ function renderWaitroom(state){
   document.getElementById('waitroom-status').textContent =
     state.players.length < 2 ? 'Esperando a que se una alguien...' : '¡Listos para empezar!';
 
-  document.getElementById('waitroom-players').innerHTML = state.players.map(p=>`
+  document.getElementById('waitroom-players').innerHTML = state.players.map(p=>{
+    const online = isFriendOnline(p.id);
+    return `
     <div class="friend-row" style="border:1px solid var(--border);border-radius:12px;padding:0.6rem 0.75rem">
-      <div class="friend-row-avatar">${(p.name||'?').charAt(0).toUpperCase()}</div>
-      <div class="friend-row-name">${p.name}${p.id===state.hostId?' (anfitrión)':''}</div>
-      <span style="font-size:12px;font-weight:700;color:var(--green)">● conectado</span>
-    </div>`).join('');
+      ${friendAvatarHtml(p.name, p.photo_url, p.id)}
+      <div class="friend-row-name">${escapeHtml(p.name)}${p.id===state.hostId?' (anfitrión)':''}</div>
+      <span style="font-size:12px;font-weight:700;color:${online?'var(--green)':'var(--text-muted)'}">${online?'● conectado':'○ desconectado'}</span>
+    </div>`;
+  }).join('');
 
   const startBtn = document.getElementById('waitroom-start-btn');
   if(isHost){
@@ -2299,8 +2545,8 @@ async function openFriendsInviteFromRoom(){
   const listEl = document.getElementById('friendpicker-list');
   listEl.innerHTML = friends.map(f=>`
     <div class="friend-row" style="cursor:pointer" onclick="sendRoomInvite('${f.id}','${(f.name||'Jugador').replace(/'/g,"\\'")}')">
-      ${friendAvatarHtml(f.name, f.photo_url)}
-      <div class="friend-row-name">${f.name||'Sin nombre'}</div>
+      ${friendAvatarHtml(f.name, f.photo_url, f.id)}
+      <div class="friend-row-name">${escapeHtml(f.name)||'Sin nombre'}${isFriendOnline(f.id)?' <span style="color:var(--green);font-size:11px">● en línea</span>':''}</div>
       <span style="font-size:12px;font-weight:700;color:var(--accent)">Invitar</span>
     </div>`).join('');
 
@@ -2315,6 +2561,8 @@ function closeFriendPicker(){
 
 async function sendRoomInvite(targetId, targetName){
   closeFriendPicker();
+  Logger.info('INVITE_FLOW_START', { targetId, targetName, roomId: currentRoomId });
+
   try {
     const { data: invite, error } = await sb.from('game_invites').insert({
       from_user: currentUser.id,
@@ -2329,19 +2577,25 @@ async function sendRoomInvite(targetId, targetName){
       // Surface the real Supabase error instead of a generic message —
       // this is what tells us WHY an invite isn't reaching the other user
       // (e.g. missing room_id column, RLS policy, etc.)
-      console.error('game_invites insert error:', error);
+      Logger.error('INVITE_CREATE_FAILED', { message: error.message, code: error.code });
       showToast('Error al invitar: ' + error.message);
       return;
     }
+    Logger.info('INVITE_CREATED', { inviteId: invite.id });
 
     showToast('Invitación enviada a ' + targetName);
 
     // Send push notification (reuses existing send-invite Edge Function)
     const { data: tokenData, error: tokenErr } = await sb.from('push_tokens').select('token').eq('user_id', targetId).single();
-    if(tokenErr){ console.error('push_tokens lookup error:', tokenErr); }
+    if(tokenErr){
+      Logger.warn('PUSH_TOKEN_LOOKUP_FAILED', { message: tokenErr.message, targetId });
+    }
 
     if(tokenData?.token){
+      Logger.info('PUSH_TOKEN_FOUND', { targetId });
       const session = await sb.auth.getSession();
+      Logger.info('PUSH_REQUEST_SENT', { inviteId: invite.id });
+
       const res = await fetch(`${SUPA_URL}/functions/v1/send-invite`, {
         method: 'POST',
         headers: {
@@ -2355,30 +2609,41 @@ async function sendRoomInvite(targetId, targetName){
           inviteId: invite.id
         })
       });
-      if(!res.ok){
+
+      if(res.ok){
+        Logger.info('EDGE_FUNCTION_OK', { inviteId: invite.id });
+      } else {
         const errBody = await res.text();
-        console.error('send-invite function failed:', res.status, errBody);
+        Logger.error('EDGE_FUNCTION_FAILED', { status: res.status, body: errBody });
+        showToast('Notificación no enviada — revisa que tu amigo tenga la app instalada');
       }
     } else {
-      console.log('No push token found for', targetName, '— they may not have opened the app yet on this device.');
+      Logger.warn('PUSH_TOKEN_MISSING', { targetId, targetName });
+      showToast(`${targetName} aún no ha abierto la app en este dispositivo — no recibirá notificación, pero la invitación quedó guardada`);
     }
   } catch(e){
-    console.error('sendRoomInvite exception:', e);
+    Logger.error('INVITE_FLOW_EXCEPTION', { message: e.message });
     showToast('Error al enviar invitación: ' + e.message);
   }
 }
 
 async function joinLiarsBarRoom(roomId){
+  Logger.info('ROOM_JOIN_ATTEMPT', { roomId });
   try {
     const { data, error } = await sb.from('game_sessions').select('*').eq('id', roomId).single();
-    if(error || !data) throw error || new Error('Room not found');
+    if(error || !data){
+      Logger.error('ROOM_JOIN_FETCH_FAILED', { roomId, message: error?.message });
+      throw error || new Error('Room not found');
+    }
 
     currentRoomId = roomId;
     const state = { ...data.state };
     if(!state.players.find(p=>p.id === currentUser.id)){
       state.players.push({ id: currentUser.id, name: currentProfile?.name || 'Jugador' });
-      await sb.from('game_sessions').update({ state, updated_at: new Date().toISOString() }).eq('id', roomId);
+      const { error: updateErr } = await sb.from('game_sessions').update({ state, updated_at: new Date().toISOString() }).eq('id', roomId);
+      if(updateErr) Logger.error('ROOM_JOIN_UPDATE_FAILED', { message: updateErr.message });
     }
+    Logger.info('ROOM_JOINED', { roomId, playerCount: state.players.length });
 
     goPage(3);
     setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
@@ -2387,18 +2652,31 @@ async function joinLiarsBarRoom(roomId){
     watchRoom();
     renderWaitroom(state);
   } catch(e){
-    console.error(e);
+    Logger.error('ROOM_JOIN_EXCEPTION', { roomId, message: e.message });
     showToast('No se pudo unir a la sala — puede que ya no exista');
   }
 }
 
 async function hostStartGame(){
   if(!currentRoomId) return;
+  Logger.info('GAME_START_ATTEMPT', { roomId: currentRoomId });
   try {
-    const { data } = await sb.from('game_sessions').select('*').eq('id', currentRoomId).single();
-    if(!data) return;
+    const { data, error: fetchErr } = await sb.from('game_sessions').select('*').eq('id', currentRoomId).single();
+    if(fetchErr || !data){
+      Logger.error('GAME_START_FETCH_FAILED', { message: fetchErr?.message });
+      showToast('No se pudo iniciar — la sala ya no existe');
+      return;
+    }
     const state = { ...data.state };
-    if(state.hostId !== currentUser.id) return; // safety: only host starts
+    if(state.hostId !== currentUser.id){
+      Logger.warn('GAME_START_NOT_HOST', { userId: currentUser.id, hostId: state.hostId });
+      return; // safety: only host starts
+    }
+    if(!state.players || state.players.length < 2){
+      Logger.warn('GAME_START_NOT_ENOUGH_PLAYERS', { count: state.players?.length });
+      showToast('Esperando a que se una otro jugador');
+      return;
+    }
 
     // Build the actual Liar's Bar game state now that we know all players
     const deck = lbShuffle([...LB_CARDS]);
@@ -2418,10 +2696,16 @@ async function hostStartGame(){
       roundNum: 1,
     };
 
-    await sb.from('game_sessions').update({ state: gameState, updated_at: new Date().toISOString() }).eq('id', currentRoomId);
+    const { error: updateErr } = await sb.from('game_sessions').update({ state: gameState, updated_at: new Date().toISOString() }).eq('id', currentRoomId);
+    if(updateErr){
+      Logger.error('GAME_START_UPDATE_FAILED', { message: updateErr.message });
+      showToast('Error al iniciar la partida');
+      return;
+    }
+    Logger.info('GAME_STARTED', { roomId: currentRoomId });
     enterActiveGame(gameState);
   } catch(e){
-    console.error(e);
+    Logger.error('GAME_START_EXCEPTION', { message: e.message });
     showToast('Error al iniciar la partida');
   }
 }
@@ -2711,6 +2995,7 @@ async function cancelInvite(){
 let currentInviteRoomId = null;
 
 async function handleIncomingInvite(invite){
+  Logger.info('INVITE_RECEIVED', { inviteId: invite.id, roomId: invite.room_id });
   currentInviteId = invite.id;
   currentInviteRoomId = invite.room_id || null;
 
@@ -2719,7 +3004,7 @@ async function handleIncomingInvite(invite){
   try {
     const { data } = await sb.from('profiles').select('name').eq('id', invite.from_user).single();
     if(data?.name) inviterName = data.name;
-  } catch(e){ console.error('Could not fetch inviter name', e); }
+  } catch(e){ Logger.warn('INVITE_INVITER_NAME_LOOKUP_FAILED', { message: e.message }); }
 
   document.getElementById('invite-title').textContent = `${inviterName} te ha invitado a jugar ${invite.game_name}`;
   document.getElementById('invite-msg').textContent = '¿Juguemos un ratito?';
@@ -2729,7 +3014,11 @@ async function handleIncomingInvite(invite){
 
 async function acceptInvite(){
   if(!currentInviteId) return;
-  await sb.from('game_invites').update({status:'accepted'}).eq('id', currentInviteId);
+  Logger.info('INVITE_ACCEPTED', { inviteId: currentInviteId, roomId: currentInviteRoomId });
+
+  const { error } = await sb.from('game_invites').update({status:'accepted'}).eq('id', currentInviteId);
+  if(error) Logger.error('INVITE_ACCEPT_UPDATE_FAILED', { message: error.message });
+
   document.getElementById('modal-invite').classList.remove('open');
   document.getElementById('backdrop-invite').classList.remove('open');
 
@@ -2740,6 +3029,9 @@ async function acceptInvite(){
     setGamesTab('juntitos', document.getElementById('games-btn-juntitos'));
     openLiarsBar();
     joinLiarsBarRoom(currentInviteRoomId);
+  } else {
+    Logger.warn('INVITE_ACCEPT_NO_ROOM_ID', { inviteId: currentInviteId });
+    showToast('No se pudo unir a la sala — falta información de la sala');
   }
   currentInviteId = null;
   currentInviteRoomId = null;
@@ -2747,7 +3039,9 @@ async function acceptInvite(){
 
 async function rejectInvite(){
   if(currentInviteId){
-    await sb.from('game_invites').update({status:'rejected'}).eq('id', currentInviteId);
+    Logger.info('INVITE_REJECTED', { inviteId: currentInviteId });
+    const { error } = await sb.from('game_invites').update({status:'rejected'}).eq('id', currentInviteId);
+    if(error) Logger.error('INVITE_REJECT_UPDATE_FAILED', { message: error.message });
     currentInviteId = null;
     currentInviteRoomId = null;
   }
@@ -2757,6 +3051,7 @@ async function rejectInvite(){
 
 function handleInviteResponse(invite){
   // Called on the inviter's side when status changes
+  Logger.info('INVITE_RESPONSE_RECEIVED', { inviteId: invite.id, status: invite.status });
   document.getElementById('modal-waiting').classList.remove('open');
   document.getElementById('backdrop-waiting').classList.remove('open');
   pendingInviteId = null;
@@ -3125,7 +3420,10 @@ function playAlertSound(){
       osc.start(ctx.currentTime + delay);
       osc.stop(ctx.currentTime  + delay + 0.25);
     });
-  } catch(e){ console.error('Audio error', e); }
+    // Close the context once the last beep finishes — without this, every
+    // call leaks an AudioContext that never gets garbage collected.
+    setTimeout(()=>{ ctx.close().catch(()=>{}); }, 1000);
+  } catch(e){ Logger.error('PLAY_ALERT_SOUND_FAILED', { message: e.message }); }
 }
 
 function fireTimerAlert(){
@@ -3292,7 +3590,7 @@ async function cancelTimerNotification(){
     if(TimerNotif){ await TimerNotif.stop().catch(()=>{}); }
     const LN = window.Capacitor?.Plugins?.LocalNotifications;
     if(LN) await LN.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
-  } catch(e){}
+  } catch(e){ Logger.debug('CANCEL_TIMER_NOTIFICATION_SKIP', { message: e.message }); }
 }
 
 // ── KEEP SCREEN AWAKE WHILE TIMER RUNS (foreground only) ──
@@ -3391,10 +3689,10 @@ function renderPlaces(){
       dd=`<div class="dd-title">Fotos</div>
           <div class="photos-grid">${ph}<label class="upload-btn"><span style="font-size:1.4rem">+</span><span>Subir</span><input type="file" accept="image/*" onchange="uploadPhoto(${p.id},this)"></label></div>
           <div class="dd-title" style="margin-top:8px">Notas</div>
-          <textarea class="note-area" id="note-${p.id}" placeholder="Escribe algo que recuerdes...">${p.notes||''}</textarea>
+          <textarea class="note-area" id="note-${p.id}" placeholder="Escribe algo que recuerdes...">${escapeHtml(p.notes)||''}</textarea>
           <button class="save-btn" onclick="saveNote(${p.id})">Guardar nota</button>
           <div class="dd-title" style="margin-top:8px">Editar descripción</div>
-          <textarea class="desc-area" id="desc-${p.id}">${p.description||''}</textarea>
+          <textarea class="desc-area" id="desc-${p.id}">${escapeHtml(p.description)||''}</textarea>
           <button class="save-btn" onclick="saveDesc(${p.id})">Guardar</button>`;
     } else {
       const ph = photos.length?photos.map(ph=>`<div class="photo-thumb"><img src="${ph.url}" alt=""></div>`).join(''):'<div class="photo-thumb" style="font-size:1.5rem">📷</div>';
@@ -3403,7 +3701,7 @@ function renderPlaces(){
       dd=`<div class="dd-title">Fotos</div>
           <div class="photos-grid">${ph}</div>
           <div class="dd-title" style="margin-top:8px">Notas</div>
-          <textarea class="note-area" id="note-${p.id}" placeholder="Escribe algo sobre este lugar...">${p.notes||''}</textarea>
+          <textarea class="note-area" id="note-${p.id}" placeholder="Escribe algo sobre este lugar...">${escapeHtml(p.notes)||''}</textarea>
           <button class="save-btn" onclick="saveNote(${p.id})">Guardar nota</button>
           <div class="dd-title" style="margin-top:8px">Videos</div>
           <div class="vid-ph">Videos — Disponible con la próxima actualización</div>
@@ -3416,8 +3714,8 @@ function renderPlaces(){
       <div class="place-hd" onclick="toggleCard(${p.id})">
         <div class="place-emoji">${p.emoji}</div>
         <div class="place-info">
-          <div class="place-name">${p.name}</div>
-          <div class="place-desc-s">${p.description||''}</div>
+          <div class="place-name">${escapeHtml(p.name)}</div>
+          <div class="place-desc-s">${escapeHtml(p.description)||''}</div>
           <div class="place-meta"><span class="tag ${p.status}">${sl(p.status)}</span></div>
         </div>
         <span class="chev">▾</span>
@@ -3506,11 +3804,27 @@ async function saveDesc(id){
 async function uploadPhoto(placeId, input){
   if(!input.files.length) return;
   const file = input.files[0];
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  const maxSizeBytes = 8 * 1024 * 1024; // 8MB
+  if(!allowedTypes.includes(file.type)){
+    showToast('Formato no permitido — usa JPG, PNG o WEBP');
+    Logger.warn('PLACE_PHOTO_REJECTED_TYPE', { type: file.type });
+    input.value = '';
+    return;
+  }
+  if(file.size > maxSizeBytes){
+    showToast('La imagen es muy grande — máximo 8MB');
+    Logger.warn('PLACE_PHOTO_REJECTED_SIZE', { size: file.size });
+    input.value = '';
+    return;
+  }
+
   const ext  = file.name.split('.').pop();
   const path = `${currentUser.id}/${placeId}/${Date.now()}.${ext}`;
   showToast('Subiendo foto...');
   const {error:upErr} = await sb.storage.from('photos').upload(path, file);
-  if(upErr){ showToast('Error al subir foto'); return; }
+  if(upErr){ Logger.error('PLACE_PHOTO_UPLOAD_FAILED', { message: upErr.message }); showToast('Error al subir foto'); return; }
   const {data:{publicUrl}} = sb.storage.from('photos').getPublicUrl(path);
   await sb.from('place_photos').insert({place_id:placeId, url:publicUrl});
   showToast('¡Foto subida! ✓');
@@ -3541,14 +3855,14 @@ function renderIdeas(){
     const txt = myVote==='yes'?'¡Te apuntaste! 🎉':myVote==='no'?'Le dijiste que no.':myVote==='maybe'?'Estás dudando.':'¿Qué opinas?';
     const who = i.profiles?.name||'Alguien';
     return `<div class="prop-card">
-      <div class="prop-top"><div class="prop-title">${i.title}</div><button class="prop-del" onclick="delIdea(${i.id})">×</button></div>
-      ${i.description?`<div class="prop-desc">${i.description}</div>`:''}
+      <div class="prop-top"><div class="prop-title">${escapeHtml(i.title)}</div><button class="prop-del" onclick="delIdea(${i.id})">×</button></div>
+      ${i.description?`<div class="prop-desc">${escapeHtml(i.description)}</div>`:''}
       <div class="votes-row">
         <button class="vote-pill yes${myVote==='yes'?' selected':''}" onclick="vote(${i.id},'yes')">✓ Sí</button>
         <button class="vote-pill maybe${myVote==='maybe'?' selected':''}" onclick="vote(${i.id},'maybe')">~ Quizás</button>
         <button class="vote-pill no${myVote==='no'?' selected':''}" onclick="vote(${i.id},'no')">✕ No</button>
       </div>
-      <div class="prop-footer"><div class="vote-result">${txt}</div><div class="prop-who">${who}</div></div>
+      <div class="prop-footer"><div class="vote-result">${txt}</div><div class="prop-who">${escapeHtml(who)}</div></div>
     </div>`;
   }).join('');
 }
@@ -3592,10 +3906,10 @@ function renderRecs(){
     <div class="rec-card">
       <div class="rec-em">${r.e}</div>
       <div class="rec-info">
-        <div class="rec-name">${r.name}</div>
-        <div class="rec-desc">${r.desc}</div>
+        <div class="rec-name">${escapeHtml(r.name)}</div>
+        <div class="rec-desc">${escapeHtml(r.desc)}</div>
         <div class="rec-foot">
-          <span class="rec-badge${r.offer?' offer':''}">${r.badge}</span>
+          <span class="rec-badge${r.offer?' offer':''}">${escapeHtml(r.badge)}</span>
           <span class="rec-dist">${r.dist}</span>
           <button class="rec-add" onclick="addRec('${r.id}')">+ Guardar</button>
         </div>
